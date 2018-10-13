@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
-public class AdvancedfxUnityInterop :  MonoBehaviour, AdvancedfxInterop.IImplentation
+public class AdvancedfxUnityInterop :  MonoBehaviour, advancedfx.Interop.IImplementation
 {
 	public string pipeName = "advancedfxInterop";
 
@@ -23,39 +23,46 @@ public class AdvancedfxUnityInterop :  MonoBehaviour, AdvancedfxInterop.IImplent
 	}
 
 	public void Awake() {
-		if (!AfxHookUnityStatus ())
-			Debug.LogError ("AfxHookUnityInit failed.");
+        //if (!AfxHookUnityStatus ())
+        //	Debug.LogError ("AfxHookUnityInit failed.");
 
-		interOp = new AdvancedfxInterop (this);
+        Application.runInBackground = true;
+
+        interOp = new advancedfx.Interop(this);
 		interOp.PipeName = pipeName;
 
 		Debug.Log (SystemInfo.graphicsDeviceVersion);
 	}
 
 	public void OnEnable() {
-
+        interOp.OnEnable();
 	}
 
 	public void OnDisable() {
+        interOp.OnDisable();
+    }
+
+    public void OnDestroy() {
 		
 	}
 
-	public void OnDestroy() {
-		
-	}
+    public void Update()
+    {
+        interOp.Update();
+    }
 
-	//
-	// AdvancedfxInterop.IImplentation:
+    //
+    // advancedfx.Interop.IImplentation:
 
-	void AdvancedfxInterop.IImplentation.Log(object message) {
+    void advancedfx.Interop.ILogging.Log(object message) {
 		Debug.Log (message, this);
 	}
 
-	void AdvancedfxInterop.IImplentation.LogException(Exception exception) {
+	void advancedfx.Interop.ILogging.LogException(Exception exception) {
 		Debug.Log (exception, this);
 	}
 
-	void AdvancedfxInterop.IImplentation.Render (AdvancedfxInterop.IRenderInfo renderInfo) {
+	void advancedfx.Interop.IImplementation.Render (advancedfx.Interop.IRenderInfo renderInfo) {
 		Camera cam = GetComponent<Camera> ();
 
 		if (null == cam)
@@ -69,7 +76,7 @@ public class AdvancedfxUnityInterop :  MonoBehaviour, AdvancedfxInterop.IImplent
 		cam.targetTexture = renderTexture;
 
 		switch (renderInfo.Type) {
-		case AdvancedfxInterop.RenderType.Normal:
+		case advancedfx.Interop.RenderType.Normal:
 			{
 				cam.Render ();
 			}
@@ -78,12 +85,12 @@ public class AdvancedfxUnityInterop :  MonoBehaviour, AdvancedfxInterop.IImplent
 
 	}
 
-	void AdvancedfxInterop.IImplentation.RegisterSurface (AdvancedfxInterop.ISurfaceInfo surfaceInfo) {
+	void advancedfx.Interop.IImplementation.RegisterSurface (advancedfx.Interop.ISurfaceInfo surfaceInfo) {
 
 		surfaceSharedHandleToSurfaceInfo [surfaceInfo.SharedHandle] = surfaceInfo;
 	}
 
-	void AdvancedfxInterop.IImplentation.DestroySurface (IntPtr sharedHandle) {
+	void advancedfx.Interop.IImplementation.DestroySurface (IntPtr sharedHandle) {
 
 		List<RenderTextureKey> renderTextureKeys = null;
 
@@ -110,7 +117,7 @@ public class AdvancedfxUnityInterop :  MonoBehaviour, AdvancedfxInterop.IImplent
 	//
 	// Private:
 
-	private AdvancedfxInterop interOp;
+	private advancedfx.Interop interOp;
 
 
 	private enum D3DFORMAT : uint {
@@ -250,7 +257,7 @@ public class AdvancedfxUnityInterop :  MonoBehaviour, AdvancedfxInterop.IImplent
 
 	private Dictionary<RenderTextureKey, RenderTexture> renderTextures = new Dictionary<RenderTextureKey, RenderTexture> ();
 	private Dictionary<IntPtr, List<RenderTextureKey>> surfaceSharedHandleToRenderTextureKeys = new Dictionary<IntPtr, List<RenderTextureKey>>();
-	private Dictionary<IntPtr, AdvancedfxInterop.ISurfaceInfo> surfaceSharedHandleToSurfaceInfo = new Dictionary<IntPtr, AdvancedfxInterop.ISurfaceInfo> ();
+	private Dictionary<IntPtr, advancedfx.Interop.ISurfaceInfo> surfaceSharedHandleToSurfaceInfo = new Dictionary<IntPtr, advancedfx.Interop.ISurfaceInfo> ();
 
 	private RenderTexture GetRenderTexture(IntPtr surfaceSharedHandle, IntPtr depthSurfaceSharedHandle)
 	{
@@ -260,8 +267,8 @@ public class AdvancedfxUnityInterop :  MonoBehaviour, AdvancedfxInterop.IImplent
 		if (renderTextures.TryGetValue (key, out renderTexture))
 			return renderTexture;
 
-		AdvancedfxInterop.ISurfaceInfo surfaceInfo = null;
-		AdvancedfxInterop.ISurfaceInfo depthSurfaceInfo = null;
+        advancedfx.Interop.ISurfaceInfo surfaceInfo = null;
+        advancedfx.Interop.ISurfaceInfo depthSurfaceInfo = null;
 
 		if (!(surfaceSharedHandleToSurfaceInfo.TryGetValue (surfaceSharedHandle, out surfaceInfo) && surfaceSharedHandleToSurfaceInfo.TryGetValue (depthSurfaceSharedHandle, out depthSurfaceInfo)))
 			return null;
@@ -297,7 +304,7 @@ public class AdvancedfxUnityInterop :  MonoBehaviour, AdvancedfxInterop.IImplent
 		return renderTexture;
 	}
 
-	private Nullable<RenderTextureDescriptor> GetRenderTextureDescriptor (AdvancedfxInterop.ISurfaceInfo surfaceInfo, AdvancedfxInterop.ISurfaceInfo depthSurfaceInfo)
+	private Nullable<RenderTextureDescriptor> GetRenderTextureDescriptor(advancedfx.Interop.ISurfaceInfo surfaceInfo, advancedfx.Interop.ISurfaceInfo depthSurfaceInfo)
 	{
 		return null;
 	}
