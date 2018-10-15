@@ -432,6 +432,8 @@ namespace advancedfx
                 {
                     thread = null;
                 }
+
+                disposed = true;
             }
 
             private enum ClientMessage : int
@@ -527,7 +529,9 @@ namespace advancedfx
                                         }
 
                                         if (commandQueue.Count < 255)
+                                        {
                                             pipeServer.WriteByte((Byte)commandQueue.Count, cancellationToken);
+                                        }
                                         else
                                         {
                                             pipeServer.WriteByte(255, cancellationToken);
@@ -592,22 +596,25 @@ namespace advancedfx
         //	IntPtr hSourceHandle, IntPtr hTargetProcessHandle, out IntPtr lpTargetHandle,
         //	uint dwDesiredAccess, [MarshalAs(UnmanagedType.Bool)] bool bInheritHandle, uint dwOptions);
 
+        // In case you wonder: we use two pipes instead of a duplex pipe in order to be able to read and write at same time from different processes without deadlocking.
         private class MyNamedPipeServer : IDisposable
         {
             enum State
             {
-                Error,
                 Waiting,
                 Connected
             }
 
-            private IntPtr pipeHandle;
             private ILogging logging;
+
+            private IntPtr pipeHandle;
+
             private OVERLAPPED overlappedRead;
             private OVERLAPPED overlappedWrite;
             private GCHandle gcOverlappedRead;
             private GCHandle gcOverlappedWrite;
-            private State state = State.Error;
+
+            private State state = State.Waiting;
 
             private IntPtr readBuffer;
             private IntPtr writeBuffer;
@@ -632,16 +639,15 @@ namespace advancedfx
 
                 pipeHandle = CreateNamedPipe(
                     "\\\\.\\pipe\\" + pipeName,
-                    (uint)(PipeOpenModeFlags.PIPE_ACCESS_DUPLEX | PipeOpenModeFlags.FILE_FLAG_OVERLAPPED),
-                    (uint)(PipeModeFlags.PIPE_TYPE_BYTE | PipeModeFlags.PIPE_READMODE_BYTE | PipeModeFlags.PIPE_WAIT | PipeModeFlags.PIPE_REJECT_REMOTE_CLIENTS),
-                    1U,
+                    (uint)(PipeOpenModeFlags.PIPE_ACCESS_INBOUND | PipeOpenModeFlags.PIPE_ACCESS_OUTBOUND | PipeOpenModeFlags.FILE_FLAG_OVERLAPPED),
+                    (uint)(PipeModeFlags.PIPE_READMODE_BYTE | PipeModeFlags.PIPE_TYPE_BYTE | PipeModeFlags.PIPE_WAIT | PipeModeFlags.PIPE_REJECT_REMOTE_CLIENTS),
+                    1,
                     (uint)writeBufferSize,
                     (uint)readBufferSize,
                     5000,
                     IntPtr.Zero);
 
                 if (INVALID_HANDLE_VALUE != overlappedRead.hEvent
-                    && INVALID_HANDLE_VALUE != overlappedWrite.hEvent
                     && INVALID_HANDLE_VALUE != pipeHandle
                     && false == ConnectNamedPipe(pipeHandle, ref overlappedRead))
                 {
@@ -653,11 +659,10 @@ namespace advancedfx
                         case ERROR_PIPE_CONNECTED:
                             state = State.Connected;
                             SetEvent(overlappedRead.hEvent);
-                            logging.Log("MyNamedPipeServer: Connected.");
                             break;
                         default:
-                            logging.Log("MyNamedPipeServer: Error: " + Marshal.GetLastWin32Error());
-                            break;
+                            Dispose();
+                            throw new System.ApplicationException("MyNamedPipeServer: Error: " + Marshal.GetLastWin32Error());
                     }
                 }
             }
@@ -686,41 +691,30 @@ namespace advancedfx
                     Marshal.FreeHGlobal(writeBuffer);
                     Marshal.FreeHGlobal(readBuffer);
                 }
+
+                disposed = true;
             }
 
             public bool Connect()
             {
-                switch (state)
+                if (State.Waiting == state)
                 {
-                    case State.Waiting:
+                    uint waitResult = WaitForSingleObject(overlappedRead.hEvent, 0);
 
-                        uint waitResult = WaitForSingleObject(overlappedRead.hEvent, 0);
-
-                        if (WAIT_OBJECT_0 != waitResult)
-                        {
-                            break;
-                        }
-
-                        logging.Log("Connect: WaitForSingleObject: Signaled.");
-
+                    if (WAIT_OBJECT_0 == waitResult)
+                    {
                         uint cb;
 
                         if (!GetOverlappedResult(pipeHandle, ref overlappedRead, out cb, false))
                         {
-                            logging.Log("Connect: GetOverlappedResult error: " + Marshal.GetLastWin32Error());
-                            state = State.Error;
-                            break;
+                            throw new System.ApplicationException("Connect: GetOverlappedResult error: " + Marshal.GetLastWin32Error());
                         }
 
                         state = State.Connected;
-                        logging.Log("Connect: Connected.");
-                        return true;
-
-                    case State.Connected:
-                        return true;
+                    }
                 }
 
-                return false;
+                return State.Connected == state;
             }
 
             public void ReadBytes(byte[] bytes, int offset, int length, CancellationToken cancellationToken)
@@ -882,8 +876,7 @@ namespace advancedfx
 
             public void WriteByte(Byte value, CancellationToken cancellationToken)
             {
-
-                WriteBytes(new Byte[value], cancellationToken);
+                WriteBytes(new Byte[1] { value }, cancellationToken);
             }
 
             public void WriteInt32(Int32 value, CancellationToken cancellationToken)
