@@ -141,6 +141,21 @@ namespace advancedfx
             Single CurTime { get; }
         }
 
+        private class FrameInfo : IFrameInfo
+        {
+            Int32 IFrameInfo.FrameCount { get { return m_FrameCount; } }
+            Single IFrameInfo.AbsoluteFrameTime { get { return m_AbsoluteFrameTime; } }
+            Single IFrameInfo.CurTime { get { return m_CurTime; } }
+
+            public Int32 FrameCount { get { return m_FrameCount; } set { m_FrameCount = value; } }
+            public Single AbsoluteFrameTime { get { return m_AbsoluteFrameTime; } set { m_AbsoluteFrameTime = value; } }
+            public Single CurTime { get { return m_CurTime; } set { m_CurTime = value; } }
+
+            Int32 m_FrameCount;
+            Single m_AbsoluteFrameTime;
+            Single m_CurTime;
+        }
+
         public enum RenderType : int
         {
             Unknown = 0,
@@ -169,31 +184,92 @@ namespace advancedfx
             Single M33;
         }
 
-        public struct ITextureInfo
+        public interface ITextureInfo
         {
-            public UInt32 TextureID;
-            public String TextureGroup;
-            public String TextureName;
-            public UInt32 D3D9Width;
-            public UInt32 D3D9Height;
-            public UInt32 D3D9Levels;
-            public D3DUSAGE D3D9Usage;
-            public D3DFORMAT D3D9Format;
-            public D3DPOOL D3D9Pool;
-            public IntPtr SharedHandle;
+            UInt32 TextureID { get; }
+            String TextureGroup { get; }
+            String TextureName { get; }
+            UInt32 D3D9Width { get; }
+            UInt32 D3D9Height { get; }
+            UInt32 D3D9Levels { get; }
+            D3DUSAGE D3D9Usage { get; }
+            D3DFORMAT D3D9Format { get; }
+            D3DPOOL D3D9Pool { get; }
+            IntPtr SharedHandle { get; }
+        }
+
+        private class TextureInfo : ITextureInfo
+        {
+            UInt32 ITextureInfo.TextureID { get { return m_TextureID; } }
+            String ITextureInfo.TextureGroup { get { return m_TextureGroup; } }
+            String ITextureInfo.TextureName { get { return m_TextureName; } }
+            UInt32 ITextureInfo.D3D9Width { get { return m_D3D9Width; } }
+            UInt32 ITextureInfo.D3D9Height { get { return m_D3D9Height; } }
+            UInt32 ITextureInfo.D3D9Levels { get { return m_D3D9Levels; } }
+            D3DUSAGE ITextureInfo.D3D9Usage { get { return m_D3D9Usage; } }
+            D3DFORMAT ITextureInfo.D3D9Format { get { return m_D3D9Format; } }
+            D3DPOOL ITextureInfo.D3D9Pool { get { return m_D3D9Pool; } }
+            IntPtr ITextureInfo.SharedHandle { get { return m_SharedHandle; } }
+
+            public UInt32 TextureID { get { return m_TextureID; } set { m_TextureID = value; } }
+            public String TextureGroup { get { return m_TextureGroup; } set { m_TextureGroup = value; } }
+            public String TextureName { get { return m_TextureName; } set { m_TextureName = value; } }
+            public UInt32 D3D9Width { get { return m_D3D9Width; } set { m_D3D9Width = value; } }
+            public UInt32 D3D9Height { get { return m_D3D9Height; } set { m_D3D9Height = value; } }
+            public UInt32 D3D9Levels { get { return m_D3D9Levels; } set { m_D3D9Levels = value; } }
+            public D3DUSAGE D3D9Usage { get { return m_D3D9Usage; } set { m_D3D9Usage = value; } }
+            public D3DFORMAT D3D9Format { get { return m_D3D9Format; } set { m_D3D9Format = value; } }
+            public D3DPOOL D3D9Pool { get { return m_D3D9Pool; } set { m_D3D9Pool = value; } }
+            public IntPtr SharedHandle { get { return m_SharedHandle; } set { m_SharedHandle = value; } }
+
+            private UInt32 m_TextureID;
+            private String m_TextureGroup;
+            private String m_TextureName;
+            private UInt32 m_D3D9Width;
+            private UInt32 m_D3D9Height;
+            private UInt32 m_D3D9Levels;
+            private D3DUSAGE m_D3D9Usage;
+            private D3DFORMAT m_D3D9Format;
+            private D3DPOOL m_D3D9Pool;
+            private IntPtr m_SharedHandle;
         }
 
         public interface IRenderInfo
         {
             RenderType Type { get; }
 
-            UInt32 FbTextureId { get; }
-            UInt32 FbDepthTextureId { get; }
+            /// <remarks>Can be null if not available, so handle this.</remarks>
+            Nullable<UInt32> FbTextureId { get; }
 
-            Afx4x4 WorldToScreenMatrix { get; }
+            /// <remarks>Can be null if not available, so handle this.</remarks>
+            Nullable<UInt32> FbDepthTextureId { get; }
+
+            /// <remarks>Can be null if not available, so handle this.</remarks>
+            Nullable<Afx4x4> WorldToScreenMatrix { get; }
 
             /// <remarks>Can be null if not available, so handle this! Assume this to happen especially at start-up!</remarks>
             IFrameInfo FrameInfo { get; }
+        }
+
+        private class RenderInfo : IRenderInfo
+        {
+            RenderType IRenderInfo.Type { get { return m_Type; } }
+            Nullable<UInt32> IRenderInfo.FbTextureId { get { return m_FbTextureId; } }
+            Nullable<UInt32> IRenderInfo.FbDepthTextureId { get { return m_FbDepthTextureId; } }
+            Nullable<Afx4x4> IRenderInfo.WorldToScreenMatrix { get { return m_WorldToScreenMatrix; } }
+            IFrameInfo IRenderInfo.FrameInfo { get { return m_FrameInfo; } }
+
+            public RenderType Type { get { return m_Type; } set { m_Type = value; } }
+            public Nullable<UInt32> FbTextureId { get { return m_FbTextureId; } set { m_FbTextureId = value; } }
+            public Nullable<UInt32> FbDepthTextureId { get { return m_FbDepthTextureId; } set { m_FbDepthTextureId = value; } }
+            public Nullable<Afx4x4> WorldToScreenMatrix { get { return m_WorldToScreenMatrix; } set { m_WorldToScreenMatrix = value; } }
+            public FrameInfo FrameInfo { get { return m_FrameInfo; } set { m_FrameInfo = value; } }
+
+            private RenderType m_Type;
+            private Nullable<UInt32> m_FbTextureId;
+            private Nullable<UInt32> m_FbDepthTextureId;
+            private Nullable<Afx4x4> m_WorldToScreenMatrix;
+            private FrameInfo m_FrameInfo;
         }
 
         public interface ILogging
@@ -314,6 +390,16 @@ namespace advancedfx
                         {
                             case DrawingMessage.DrawingThreadBeforeHud:
                                 {
+                                    RenderInfo renderInfo = new RenderInfo();
+
+                                    renderInfo.Type = RenderType.Normal;
+
+                                    UInt32 fbTexture = (UInt32)pipeServer.ReadInt32(cancellationToken);
+                                    renderInfo.FbTextureId = 0 != fbTexture ? new Nullable<UInt32>(fbTexture) : null;
+
+                                    UInt32 fbDepthTexture = (UInt32)pipeServer.ReadInt32(cancellationToken);
+                                    renderInfo.FbDepthTextureId = 0 != fbDepthTexture ? new Nullable<UInt32>(fbDepthTexture) : null;
+
                                     IFrameInfo frameInfo = null;
                                     bool frameInfoAvailable = pipeServer.ReadBoolean(cancellationToken);
 
@@ -363,9 +449,16 @@ namespace advancedfx
                                         } while (null == frameInfo);
                                     }
 
+                                    // Rendering:
+
+                                    implementation.Render(renderInfo);
+
                                     // Signal done (this is important so we can sync the drawing!):
                                     pipeServer.WriteBoolean(true, cancellationToken);
                                     pipeServer.Flush(cancellationToken);
+
+                                    implementation.Log("5");
+
 
                                     done = true; // We are done for this frame.
                                 }
@@ -373,7 +466,7 @@ namespace advancedfx
 
                             case DrawingMessage.NewTexture:
                                 {
-                                    ITextureInfo textureInfo = new ITextureInfo();
+                                    TextureInfo textureInfo = new TextureInfo();
 
                                     // TextureId:
                                     textureInfo.TextureID = (UInt32)pipeServer.ReadInt32(cancellationToken);
@@ -385,8 +478,9 @@ namespace advancedfx
                                     textureInfo.D3D9Usage = (D3DUSAGE)(UInt32)pipeServer.ReadInt32(cancellationToken);
                                     textureInfo.D3D9Format = (D3DFORMAT)(UInt32)pipeServer.ReadInt32(cancellationToken);
                                     textureInfo.D3D9Pool = (D3DPOOL)(UInt32)pipeServer.ReadInt32(cancellationToken);
-
                                     textureInfo.SharedHandle = pipeServer.ReadHandle(cancellationToken);
+
+                                    implementation.Log(textureInfo.TextureGroup + " " + textureInfo.TextureName);
 
                                     implementation.RegisterTexture(textureInfo);
                                 }
@@ -650,48 +744,7 @@ namespace advancedfx
 
             private Queue<String> commandQueue = new Queue<String>();
 
-            private class FrameInfo : IFrameInfo
-            {
-                public Int32 FrameCount
-                {
-                    get
-                    {
-                        return frameCount;
-                    }
-                    set
-                    {
-                        frameCount = value;
-                    }
-                }
-                public Single AbsoluteFrameTime
-                {
-                    get
-                    {
-                        return absoluteFrameTime;
-                    }
-                    set
-                    {
-                        absoluteFrameTime = value;
-                    }
-                }
-                public Single CurTime
-                {
-                    get
-                    {
-                        return curTime;
-                    }
-                    set
-                    {
-                        curTime = value;
-                    }
-                }
-
-                Int32 frameCount;
-                Single absoluteFrameTime;
-                Single curTime;
-            }
-
-            private void ThreadWorker()
+             private void ThreadWorker()
             {
                 bool messageSent = false;
 
@@ -969,8 +1022,12 @@ namespace advancedfx
 
             public Boolean ReadBoolean(CancellationToken cancellationToken)
             {
+                return 0 != ReadByte(cancellationToken);
+            }
 
-                return BitConverter.ToBoolean(ReadBytes(sizeof(Boolean), cancellationToken), 0);
+            public Byte ReadByte(CancellationToken cancellationToken)
+            {
+                return ReadBytes(sizeof(Byte), cancellationToken)[0];
             }
 
             public Int32 ReadInt32(CancellationToken cancellationToken)
@@ -1067,8 +1124,7 @@ namespace advancedfx
 
             public void WriteBoolean(Boolean value, CancellationToken cancellationToken)
             {
-
-                WriteBytes(BitConverter.GetBytes(value), cancellationToken);
+                WriteByte(value ? (Byte)1 : (Byte)0, cancellationToken);
             }
 
             public void WriteByte(Byte value, CancellationToken cancellationToken)
