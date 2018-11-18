@@ -69,7 +69,7 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 
     void advancedfx.Interop.IImplementation.ConnectionLost() {
 
-        ReleaseTextures();
+        ReleaseSurfaces();
     }
 
     void advancedfx.Interop.IImplementation.Render (advancedfx.Interop.IRenderInfo renderInfo) {
@@ -79,15 +79,18 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 			return;
 
         // Currently we require a frame and a depth buffer, this might change later:
-        if (!renderInfo.FbTextureId.HasValue || !renderInfo.FbDepthTextureId.HasValue)
+        if (!renderInfo.FbSurfaceID.HasValue || !renderInfo.FbDepthSurfaceID.HasValue)
             return;
 
-		RenderTexture renderTexture = GetRenderTexture(renderInfo.FbTextureId.Value, renderInfo.FbDepthTextureId.Value);
+        Debug.Log("FbSurfaceID="+ renderInfo.FbSurfaceID.Value+", FbDepthTextureId="+ renderInfo.FbDepthSurfaceID.Value);
+        return;
+
+        RenderTexture renderTexture = GetRenderTexture(renderInfo.FbSurfaceID.Value, renderInfo.FbDepthSurfaceID.Value);
 
 		if (null == renderTexture)
 			return;
 
-		cam.targetTexture = renderTexture;
+        cam.targetTexture = renderTexture;
 
 		switch (renderInfo.Type) {
 		case advancedfx.Interop.RenderType.Normal:
@@ -99,14 +102,25 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 
 	}
 
-	void advancedfx.Interop.IImplementation.RegisterTexture (advancedfx.Interop.ITextureInfo info) {
+    void advancedfx.Interop.IImplementation.RegisterSurface(advancedfx.Interop.ISurfaceInfo info)
+    {
+        Debug.Log("Registering Surface: " + info.SurfaceID);
 
-		textureIdToTextureInfo [info.TextureID] = info;
+        surfaceIDToSurfaceInfo[info.SurfaceID] = info;
+    }
+
+    void advancedfx.Interop.IImplementation.ReleaseSurface(UInt32 surfaceID)
+    {
+        Debug.Log("REleasing Surface: " + surfaceID);
+
+        this.ReleaseSurface(surfaceID);
+    }
+
+
+    void advancedfx.Interop.IImplementation.RegisterTexture (advancedfx.Interop.ITextureInfo info) {
 	}
 
 	void advancedfx.Interop.IImplementation.ReleaseTexture(UInt32 textureId) {
-
-        this.ReleaseTexture(textureId);
 	}
 
 	//
@@ -139,40 +153,40 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 
 	private struct RenderTextureKey
 	{
-        public RenderTextureKey(UInt32 fbTextureId, UInt32 fbDepthTextureId)
+        public RenderTextureKey(UInt32 fbSurfaceID, UInt32 fbDepthSurfaceID)
         {
-            this.FbTextureId = fbTextureId;
-            this.FbDepthTextureId = fbDepthTextureId;
+            this.FbSurfaceID = fbSurfaceID;
+            this.FbDepthSurfaceID = fbDepthSurfaceID;
         }
 
-		public readonly UInt32 FbTextureId;
-        public readonly UInt32 FbDepthTextureId;
+		public readonly UInt32 FbSurfaceID;
+        public readonly UInt32 FbDepthSurfaceID;
 	}
 
     private Dictionary<RenderTextureKey, RenderTexture> renderTextures = new Dictionary<RenderTextureKey, RenderTexture> ();
-	private Dictionary<UInt32, List<RenderTextureKey>> textureIdToRenderTextureKeys = new Dictionary<UInt32, List<RenderTextureKey>>();
-	private Dictionary<UInt32, advancedfx.Interop.ITextureInfo> textureIdToTextureInfo = new Dictionary<UInt32, advancedfx.Interop.ITextureInfo> ();
+	private Dictionary<UInt32, List<RenderTextureKey>> surfaceIDToRenderTextureKeys = new Dictionary<UInt32, List<RenderTextureKey>>();
+	private Dictionary<UInt32, advancedfx.Interop.ISurfaceInfo> surfaceIDToSurfaceInfo = new Dictionary<UInt32, advancedfx.Interop.ISurfaceInfo> ();
 
-	private RenderTexture GetRenderTexture(UInt32 fbTextureId, UInt32 fbDepthTextureId)
+	private RenderTexture GetRenderTexture(UInt32 fbSurfaceID, UInt32 fbDepthSufaceId)
 	{
-		RenderTextureKey key = new RenderTextureKey (fbTextureId, fbDepthTextureId);
+		RenderTextureKey key = new RenderTextureKey (fbSurfaceID, fbDepthSufaceId);
 		RenderTexture renderTexture = null;
 
 		if (renderTextures.TryGetValue (key, out renderTexture))
 			return renderTexture;
 
-        advancedfx.Interop.ITextureInfo fbTextureInfo;
-        advancedfx.Interop.ITextureInfo fbDepthTextureInfo;
+        advancedfx.Interop.ISurfaceInfo fbSurfaceInfo;
+        advancedfx.Interop.ISurfaceInfo fbDepthSurfaceInfo;
 
-		if (!(textureIdToTextureInfo.TryGetValue (fbTextureId, out fbTextureInfo) && textureIdToTextureInfo.TryGetValue (fbDepthTextureId, out fbDepthTextureInfo)))
+		if (!(surfaceIDToSurfaceInfo.TryGetValue (fbSurfaceID, out fbSurfaceInfo) && surfaceIDToSurfaceInfo.TryGetValue (fbDepthSufaceId, out fbDepthSurfaceInfo)))
 			return null;
 
-		Nullable<RenderTextureDescriptor> rdesc = GetRenderTextureDescriptor (fbTextureInfo, fbDepthTextureInfo);
+		Nullable<RenderTextureDescriptor> rdesc = GetRenderTextureDescriptor (fbSurfaceInfo, fbDepthSurfaceInfo);
 
 		if (!rdesc.HasValue)
 			return null;
 
-		AfxHookUnityBeginCreateRenderTexture (fbTextureInfo.SharedHandle, fbDepthTextureInfo.SharedHandle);
+		AfxHookUnityBeginCreateRenderTexture (fbSurfaceInfo.SharedHandle, fbDepthSurfaceInfo.SharedHandle);
 
 		renderTexture = new RenderTexture (rdesc.Value);
 		renderTexture.Create ();
@@ -182,33 +196,33 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 		renderTextures [key] = renderTexture;
 
 		List<RenderTextureKey> list = null;
-		if (!textureIdToRenderTextureKeys.TryGetValue (fbTextureId, out list)) {
+		if (!surfaceIDToRenderTextureKeys.TryGetValue (fbSurfaceID, out list)) {
 			list = new List<RenderTextureKey>();
-            textureIdToRenderTextureKeys[fbTextureId] = list;
+            surfaceIDToRenderTextureKeys[fbSurfaceID] = list;
 		}
 		list.Add (key);
 
 		list = null;
-		if (!textureIdToRenderTextureKeys.TryGetValue (fbDepthTextureId, out list)) {
+		if (!surfaceIDToRenderTextureKeys.TryGetValue (fbDepthSufaceId, out list)) {
 			list = new List<RenderTextureKey>();
-            textureIdToRenderTextureKeys[fbDepthTextureId] = list;
+            surfaceIDToRenderTextureKeys[fbDepthSufaceId] = list;
 		}
 		list.Add (key);
 
 		return renderTexture;
 	}
 
-	private Nullable<RenderTextureDescriptor> GetRenderTextureDescriptor(advancedfx.Interop.ITextureInfo fbTextureInfo, advancedfx.Interop.ITextureInfo fbDepthTextureInfo)
+	private Nullable<RenderTextureDescriptor> GetRenderTextureDescriptor(advancedfx.Interop.ISurfaceInfo fbSurfaceInfo, advancedfx.Interop.ISurfaceInfo fbDepthSurfaceInfo)
 	{
         if (
-            fbTextureInfo.D3D9Width != fbDepthTextureInfo.D3D9Width
-            || fbTextureInfo.D3D9Height != fbDepthTextureInfo.D3D9Height
+            fbSurfaceInfo.Width != fbDepthSurfaceInfo.Width
+            || fbSurfaceInfo.Height != fbDepthSurfaceInfo.Height
         )
             return null;
 
-        RenderTextureDescriptor desc = new RenderTextureDescriptor((int)fbTextureInfo.D3D9Width, (int)fbTextureInfo.D3D9Height);
+        RenderTextureDescriptor desc = new RenderTextureDescriptor((int)fbSurfaceInfo.Width, (int)fbSurfaceInfo.Height);
 
-        switch (fbTextureInfo.D3D9Format)
+        switch (fbSurfaceInfo.Format)
         {
             case advancedfx.Interop.D3DFORMAT.D3DFMT_A8R8G8B8:
                 desc.colorFormat = RenderTextureFormat.ARGB32;
@@ -229,7 +243,7 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
                 return null;
         }
 
-        switch(fbDepthTextureInfo.D3D9Format) // these might be wrong:
+        switch(fbSurfaceInfo.Format) // these might be wrong:
         {
             case advancedfx.Interop.D3DFORMAT.D3DFMT_D16_LOCKABLE:
                 desc.depthBufferBits = 16;
@@ -253,6 +267,7 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
                 return null;
         }
 
+        // TODO: MSAA should be handled maybe.
         desc.autoGenerateMips = false;
         desc.bindMS = false;
         desc.enableRandomWrite = false;
@@ -263,12 +278,11 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
         return new Nullable<RenderTextureDescriptor>(desc);
 	}
 
-    private void ReleaseTexture(UInt32 textureId)
+    private void ReleaseSurface(UInt32 surfaceID)
     {
-
         List<RenderTextureKey> renderTextureKeys = null;
 
-        if (textureIdToRenderTextureKeys.TryGetValue(textureId, out renderTextureKeys))
+        if (surfaceIDToRenderTextureKeys.TryGetValue(surfaceID, out renderTextureKeys))
         {
 
             foreach (RenderTextureKey renderTextureKey in renderTextureKeys)
@@ -285,17 +299,21 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
                 }
             }
 
-            textureIdToRenderTextureKeys.Remove(textureId);
+            surfaceIDToRenderTextureKeys.Remove(surfaceID);
         }
 
-        textureIdToTextureInfo.Remove(textureId);
+        surfaceIDToSurfaceInfo.Remove(surfaceID);
     }
 
-    private void ReleaseTextures()
+    private void ReleaseSurfaces()
     {
-       while(0 < textureIdToTextureInfo.Count)
+       while(true)
        {
-            ReleaseTexture(textureIdToTextureInfo.GetEnumerator().Current.Key);
+            IEnumerator<uint> keyEnumerator = surfaceIDToSurfaceInfo.Keys.GetEnumerator();
+            if (!keyEnumerator.MoveNext())
+                return;
+
+            ReleaseSurface(keyEnumerator.Current);
        }
     }
 		

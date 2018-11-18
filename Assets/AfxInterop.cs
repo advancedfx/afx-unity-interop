@@ -126,6 +126,28 @@ namespace advancedfx
             //D3DPOOL_FORCE_DWORD = 0x7fffffff
         }
 
+        public enum D3DMULTISAMPLE_TYPE
+        {
+            D3DMULTISAMPLE_NONE = 0,
+            D3DMULTISAMPLE_NONMASKABLE = 1,
+            D3DMULTISAMPLE_2_SAMPLES = 2,
+            D3DMULTISAMPLE_3_SAMPLES = 3,
+            D3DMULTISAMPLE_4_SAMPLES = 4,
+            D3DMULTISAMPLE_5_SAMPLES = 5,
+            D3DMULTISAMPLE_6_SAMPLES = 6,
+            D3DMULTISAMPLE_7_SAMPLES = 7,
+            D3DMULTISAMPLE_8_SAMPLES = 8,
+            D3DMULTISAMPLE_9_SAMPLES = 9,
+            D3DMULTISAMPLE_10_SAMPLES = 10,
+            D3DMULTISAMPLE_11_SAMPLES = 11,
+            D3DMULTISAMPLE_12_SAMPLES = 12,
+            D3DMULTISAMPLE_13_SAMPLES = 13,
+            D3DMULTISAMPLE_14_SAMPLES = 14,
+            D3DMULTISAMPLE_15_SAMPLES = 15,
+            D3DMULTISAMPLE_16_SAMPLES = 16,
+            //D3DMULTISAMPLE_FORCE_DWORD = 0xffffffff
+        }
+
         [Flags]
         public enum D3DUSAGE : UInt32
         {
@@ -234,15 +256,61 @@ namespace advancedfx
             private IntPtr m_SharedHandle;
         }
 
+        public interface ISurfaceInfo
+        {
+            UInt32 SurfaceID { get; }
+            UInt32 Width { get; }
+            UInt32 Height { get; }
+            D3DUSAGE Usage { get; }
+            D3DFORMAT Format { get; }
+            D3DPOOL Pool { get; }
+            D3DMULTISAMPLE_TYPE MultiSample { get; }
+            UInt32 MultisampleQuality { get; }
+            IntPtr SharedHandle { get; }
+        }
+
+        private class SurfaceInfo : ISurfaceInfo
+        {
+            UInt32 ISurfaceInfo.SurfaceID { get { return m_SurfaceID; } }
+            UInt32 ISurfaceInfo.Width { get { return m_Width; } }
+            UInt32 ISurfaceInfo.Height { get { return m_Height; } }
+            D3DUSAGE ISurfaceInfo.Usage { get { return m_Usage; } }
+            D3DFORMAT ISurfaceInfo.Format { get { return m_Format; } }
+            D3DPOOL ISurfaceInfo.Pool { get { return m_Pool; } }
+            D3DMULTISAMPLE_TYPE ISurfaceInfo.MultiSample { get { return m_MultiSample;  } }
+            UInt32 ISurfaceInfo.MultisampleQuality { get { return m_MultisampleQuality; } }
+            IntPtr ISurfaceInfo.SharedHandle { get { return m_SharedHandle; }  }
+
+            public UInt32 SurfaceID { get { return m_SurfaceID; } set { m_SurfaceID = value; } }
+            public UInt32 Width { get { return m_Width; } set { m_Width = value; } }
+            public UInt32 Height { get { return m_Height; } set { m_Height = value; } }
+            public D3DUSAGE Usage { get { return m_Usage; } set { m_Usage = value; } }
+            public D3DFORMAT Format { get { return m_Format; } set { m_Format = value; } }
+            public D3DPOOL Pool { get { return m_Pool; } set { m_Pool = value; } }
+            public D3DMULTISAMPLE_TYPE MultiSample { get { return m_MultiSample; } set { m_MultiSample = value; } }
+            public UInt32 MultisampleQuality { get { return m_MultisampleQuality; } set { m_MultisampleQuality = value; } }
+            public IntPtr SharedHandle { get { return m_SharedHandle; } set { m_SharedHandle = value; } }
+
+            private UInt32 m_SurfaceID;
+            private UInt32 m_Width;
+            private UInt32 m_Height;
+            private D3DUSAGE m_Usage;
+            private D3DFORMAT m_Format;
+            private D3DPOOL m_Pool;
+            private D3DMULTISAMPLE_TYPE m_MultiSample;
+            private UInt32 m_MultisampleQuality;
+            private IntPtr m_SharedHandle;
+        }
+
         public interface IRenderInfo
         {
             RenderType Type { get; }
 
             /// <remarks>Can be null if not available, so handle this.</remarks>
-            Nullable<UInt32> FbTextureId { get; }
+            Nullable<UInt32> FbSurfaceID { get; }
 
             /// <remarks>Can be null if not available, so handle this.</remarks>
-            Nullable<UInt32> FbDepthTextureId { get; }
+            Nullable<UInt32> FbDepthSurfaceID { get; }
 
             /// <remarks>Can be null if not available, so handle this.</remarks>
             Nullable<Afx4x4> WorldToScreenMatrix { get; }
@@ -254,20 +322,20 @@ namespace advancedfx
         private class RenderInfo : IRenderInfo
         {
             RenderType IRenderInfo.Type { get { return m_Type; } }
-            Nullable<UInt32> IRenderInfo.FbTextureId { get { return m_FbTextureId; } }
-            Nullable<UInt32> IRenderInfo.FbDepthTextureId { get { return m_FbDepthTextureId; } }
+            Nullable<UInt32> IRenderInfo.FbSurfaceID { get { return m_FbSurfaceID; } }
+            Nullable<UInt32> IRenderInfo.FbDepthSurfaceID { get { return m_FbDepthSurfaceID; } }
             Nullable<Afx4x4> IRenderInfo.WorldToScreenMatrix { get { return m_WorldToScreenMatrix; } }
             IFrameInfo IRenderInfo.FrameInfo { get { return m_FrameInfo; } }
 
             public RenderType Type { get { return m_Type; } set { m_Type = value; } }
-            public Nullable<UInt32> FbTextureId { get { return m_FbTextureId; } set { m_FbTextureId = value; } }
-            public Nullable<UInt32> FbDepthTextureId { get { return m_FbDepthTextureId; } set { m_FbDepthTextureId = value; } }
+            public Nullable<UInt32> FbSurfaceID { get { return m_FbSurfaceID; } set { m_FbSurfaceID = value; } }
+            public Nullable<UInt32> FbDepthSurfaceID { get { return m_FbDepthSurfaceID; } set { m_FbDepthSurfaceID = value; } }
             public Nullable<Afx4x4> WorldToScreenMatrix { get { return m_WorldToScreenMatrix; } set { m_WorldToScreenMatrix = value; } }
             public FrameInfo FrameInfo { get { return m_FrameInfo; } set { m_FrameInfo = value; } }
 
             private RenderType m_Type;
-            private Nullable<UInt32> m_FbTextureId;
-            private Nullable<UInt32> m_FbDepthTextureId;
+            private Nullable<UInt32> m_FbSurfaceID;
+            private Nullable<UInt32> m_FbDepthSurfaceID;
             private Nullable<Afx4x4> m_WorldToScreenMatrix;
             private FrameInfo m_FrameInfo;
         }
@@ -295,15 +363,29 @@ namespace advancedfx
             void Render(IRenderInfo renderInfo);
 
             /// <summary>
+            /// Offers a shared surface for usage.
+            /// </summary>
+            /// <param name="info">Info about the surface offerred.</param>
+            void RegisterSurface(ISurfaceInfo info);
+
+            /// <summary>
+            /// A surface surface must be released (if in use)!
+            /// </summary>
+            /// <param name="surfaceID">The ID of the surface.</param>
+            void ReleaseSurface(UInt32 surfaceID);
+
+            /// <summary>
             /// Offers a shared texture for usage.
             /// </summary>
-            /// <param name="info">Info aout the texture offerred.</param>
+            /// <param name="info">Info about the texture offerred.</param>
+            /// <remarks>This is currently not used!</remarks>
             void RegisterTexture(ITextureInfo info);
 
             /// <summary>
             /// A shared texture must be released (if in use)!
             /// </summary>
             /// <param name="textureId">The ID of the texture.</param>
+            /// <remarks>This is currently not used!</remarks>
             void ReleaseTexture(UInt32 textureId);
         }
 
@@ -326,7 +408,6 @@ namespace advancedfx
 
         public void Update()
         {
-
             Interlocked.Exchange(ref watchDogMs, 0);
 
             if (null != pipeServer && pipeServer.Connect())
@@ -394,11 +475,11 @@ namespace advancedfx
 
                                     renderInfo.Type = RenderType.Normal;
 
-                                    UInt32 fbTexture = (UInt32)pipeServer.ReadInt32(cancellationToken);
-                                    renderInfo.FbTextureId = 0 != fbTexture ? new Nullable<UInt32>(fbTexture) : null;
+                                    UInt32 fbSurfaceID = (UInt32)pipeServer.ReadInt32(cancellationToken);
+                                    renderInfo.FbSurfaceID = 0 != fbSurfaceID ? new Nullable<UInt32>(fbSurfaceID) : null;
 
-                                    UInt32 fbDepthTexture = (UInt32)pipeServer.ReadInt32(cancellationToken);
-                                    renderInfo.FbDepthTextureId = 0 != fbDepthTexture ? new Nullable<UInt32>(fbDepthTexture) : null;
+                                    UInt32 fbDepthSurfaceID = (UInt32)pipeServer.ReadInt32(cancellationToken);
+                                    renderInfo.FbDepthSurfaceID = 0 != fbDepthSurfaceID ? new Nullable<UInt32>(fbDepthSurfaceID) : null;
 
                                     IFrameInfo frameInfo = null;
                                     bool frameInfoAvailable = pipeServer.ReadBoolean(cancellationToken);
@@ -456,10 +537,7 @@ namespace advancedfx
                                     // Signal done (this is important so we can sync the drawing!):
                                     pipeServer.WriteBoolean(true, cancellationToken);
                                     pipeServer.Flush(cancellationToken);
-
-                                    implementation.Log("5");
-
-
+                                    
                                     done = true; // We are done for this frame.
                                 }
                                 break;
@@ -480,8 +558,6 @@ namespace advancedfx
                                     textureInfo.D3D9Pool = (D3DPOOL)(UInt32)pipeServer.ReadInt32(cancellationToken);
                                     textureInfo.SharedHandle = pipeServer.ReadHandle(cancellationToken);
 
-                                    implementation.Log(textureInfo.TextureGroup + " " + textureInfo.TextureName);
-
                                     implementation.RegisterTexture(textureInfo);
                                 }
                                 break;
@@ -489,8 +565,38 @@ namespace advancedfx
                             case DrawingMessage.ReleaseTexture:
                                 {
                                     UInt32 textureId = (UInt32)pipeServer.ReadInt32(cancellationToken);
-
                                     implementation.ReleaseTexture(textureId);
+
+                                    // Confirm the release to the client waiting:
+
+                                    pipeServer.WriteBoolean(true, cancellationToken);
+                                    pipeServer.Flush(cancellationToken);
+                                }
+                                break;
+
+                            case DrawingMessage.NewSurface:
+                                {
+                                    SurfaceInfo surfaceInfo = new SurfaceInfo();
+
+                                    // TextureId:
+                                    surfaceInfo.SurfaceID = (UInt32)pipeServer.ReadInt32(cancellationToken);
+                                    surfaceInfo.Width = (UInt32)pipeServer.ReadInt32(cancellationToken);
+                                    surfaceInfo.Height = (UInt32)pipeServer.ReadInt32(cancellationToken);
+                                    surfaceInfo.Usage = (D3DUSAGE)(UInt32)pipeServer.ReadInt32(cancellationToken);
+                                    surfaceInfo.Format = (D3DFORMAT)(UInt32)pipeServer.ReadInt32(cancellationToken);
+                                    surfaceInfo.Pool = (D3DPOOL)(UInt32)pipeServer.ReadInt32(cancellationToken);
+                                    surfaceInfo.MultiSample = (D3DMULTISAMPLE_TYPE)(UInt32)pipeServer.ReadInt32(cancellationToken);
+                                    surfaceInfo.MultisampleQuality = (UInt32)pipeServer.ReadInt32(cancellationToken);
+                                    surfaceInfo.SharedHandle = pipeServer.ReadHandle(cancellationToken);
+
+                                    implementation.RegisterSurface(surfaceInfo);
+                                }
+                                break;
+
+                            case DrawingMessage.ReleaseSurface:
+                                {
+                                    UInt32 surfaceID = (UInt32)pipeServer.ReadInt32(cancellationToken);
+                                    implementation.ReleaseSurface(surfaceID);
 
                                     // Confirm the release to the client waiting:
 
@@ -538,6 +644,8 @@ namespace advancedfx
             DrawingThreadBeforeHud = 1,
             NewTexture = 2,
             ReleaseTexture = 3,
+            NewSurface = 4,
+            ReleaseSurface = 5
         };
 
         private IImplementation implementation;
