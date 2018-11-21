@@ -258,48 +258,44 @@ namespace advancedfx
 
         public interface ISurfaceInfo
         {
-            UInt32 SurfaceID { get; }
+            IntPtr SharedHandle { get; }
             UInt32 Width { get; }
             UInt32 Height { get; }
             D3DUSAGE Usage { get; }
             D3DFORMAT Format { get; }
             D3DPOOL Pool { get; }
-            D3DMULTISAMPLE_TYPE MultiSample { get; }
-            UInt32 MultisampleQuality { get; }
-            IntPtr SharedHandle { get; }
+            D3DMULTISAMPLE_TYPE MultiSampleType { get; }
+            UInt32 MultiSampleQuality { get; }
         }
 
         private class SurfaceInfo : ISurfaceInfo
         {
-            UInt32 ISurfaceInfo.SurfaceID { get { return m_SurfaceID; } }
+            IntPtr ISurfaceInfo.SharedHandle { get { return m_SharedHandle; } }
             UInt32 ISurfaceInfo.Width { get { return m_Width; } }
             UInt32 ISurfaceInfo.Height { get { return m_Height; } }
             D3DUSAGE ISurfaceInfo.Usage { get { return m_Usage; } }
             D3DFORMAT ISurfaceInfo.Format { get { return m_Format; } }
             D3DPOOL ISurfaceInfo.Pool { get { return m_Pool; } }
-            D3DMULTISAMPLE_TYPE ISurfaceInfo.MultiSample { get { return m_MultiSample;  } }
-            UInt32 ISurfaceInfo.MultisampleQuality { get { return m_MultisampleQuality; } }
-            IntPtr ISurfaceInfo.SharedHandle { get { return m_SharedHandle; }  }
+            D3DMULTISAMPLE_TYPE ISurfaceInfo.MultiSampleType { get { return m_MultiSampleType;  } }
+            UInt32 ISurfaceInfo.MultiSampleQuality { get { return m_MultiSampleQuality; } }
 
-            public UInt32 SurfaceID { get { return m_SurfaceID; } set { m_SurfaceID = value; } }
+            public IntPtr SharedHandle { get { return m_SharedHandle; } set { m_SharedHandle = value; } }
             public UInt32 Width { get { return m_Width; } set { m_Width = value; } }
             public UInt32 Height { get { return m_Height; } set { m_Height = value; } }
             public D3DUSAGE Usage { get { return m_Usage; } set { m_Usage = value; } }
             public D3DFORMAT Format { get { return m_Format; } set { m_Format = value; } }
             public D3DPOOL Pool { get { return m_Pool; } set { m_Pool = value; } }
-            public D3DMULTISAMPLE_TYPE MultiSample { get { return m_MultiSample; } set { m_MultiSample = value; } }
-            public UInt32 MultisampleQuality { get { return m_MultisampleQuality; } set { m_MultisampleQuality = value; } }
-            public IntPtr SharedHandle { get { return m_SharedHandle; } set { m_SharedHandle = value; } }
+            public D3DMULTISAMPLE_TYPE MultiSampleType { get { return m_MultiSampleType; } set { m_MultiSampleType = value; } }
+            public UInt32 MultiSampleQuality { get { return m_MultiSampleQuality; } set { m_MultiSampleQuality = value; } }
 
-            private UInt32 m_SurfaceID;
+            private IntPtr m_SharedHandle;
             private UInt32 m_Width;
             private UInt32 m_Height;
             private D3DUSAGE m_Usage;
             private D3DFORMAT m_Format;
             private D3DPOOL m_Pool;
-            private D3DMULTISAMPLE_TYPE m_MultiSample;
-            private UInt32 m_MultisampleQuality;
-            private IntPtr m_SharedHandle;
+            private D3DMULTISAMPLE_TYPE m_MultiSampleType;
+            private UInt32 m_MultiSampleQuality;
         }
 
         public interface IRenderInfo
@@ -307,10 +303,10 @@ namespace advancedfx
             RenderType Type { get; }
 
             /// <remarks>Can be null if not available, so handle this.</remarks>
-            Nullable<UInt32> FbSurfaceID { get; }
+            Nullable<IntPtr> FbSurfaceHandle { get; }
 
             /// <remarks>Can be null if not available, so handle this.</remarks>
-            Nullable<UInt32> FbDepthSurfaceID { get; }
+            Nullable<IntPtr> FbDepthSurfaceHandle { get; }
 
             /// <remarks>Can be null if not available, so handle this.</remarks>
             Nullable<Afx4x4> WorldToScreenMatrix { get; }
@@ -322,20 +318,20 @@ namespace advancedfx
         private class RenderInfo : IRenderInfo
         {
             RenderType IRenderInfo.Type { get { return m_Type; } }
-            Nullable<UInt32> IRenderInfo.FbSurfaceID { get { return m_FbSurfaceID; } }
-            Nullable<UInt32> IRenderInfo.FbDepthSurfaceID { get { return m_FbDepthSurfaceID; } }
+            Nullable<IntPtr> IRenderInfo.FbSurfaceHandle { get { return m_FbSurfaceHandle; } }
+            Nullable<IntPtr> IRenderInfo.FbDepthSurfaceHandle { get { return m_FbDepthSurfaceHandle; } }
             Nullable<Afx4x4> IRenderInfo.WorldToScreenMatrix { get { return m_WorldToScreenMatrix; } }
             IFrameInfo IRenderInfo.FrameInfo { get { return m_FrameInfo; } }
 
             public RenderType Type { get { return m_Type; } set { m_Type = value; } }
-            public Nullable<UInt32> FbSurfaceID { get { return m_FbSurfaceID; } set { m_FbSurfaceID = value; } }
-            public Nullable<UInt32> FbDepthSurfaceID { get { return m_FbDepthSurfaceID; } set { m_FbDepthSurfaceID = value; } }
+            public Nullable<IntPtr> FbSurfaceHandle { get { return m_FbSurfaceHandle; } set { m_FbSurfaceHandle = value; } }
+            public Nullable<IntPtr> FbDepthSurfaceHandle { get { return m_FbDepthSurfaceHandle; } set { m_FbDepthSurfaceHandle = value; } }
             public Nullable<Afx4x4> WorldToScreenMatrix { get { return m_WorldToScreenMatrix; } set { m_WorldToScreenMatrix = value; } }
             public FrameInfo FrameInfo { get { return m_FrameInfo; } set { m_FrameInfo = value; } }
 
             private RenderType m_Type;
-            private Nullable<UInt32> m_FbSurfaceID;
-            private Nullable<UInt32> m_FbDepthSurfaceID;
+            private Nullable<IntPtr> m_FbSurfaceHandle;
+            private Nullable<IntPtr> m_FbDepthSurfaceHandle;
             private Nullable<Afx4x4> m_WorldToScreenMatrix;
             private FrameInfo m_FrameInfo;
         }
@@ -371,8 +367,8 @@ namespace advancedfx
             /// <summary>
             /// A surface surface must be released (if in use)!
             /// </summary>
-            /// <param name="surfaceID">The ID of the surface.</param>
-            void ReleaseSurface(UInt32 surfaceID);
+            /// <param name="surfaceHandle">The handle of the surface.</param>
+            void ReleaseSurface(IntPtr surfaceHandle);
 
             /// <summary>
             /// Offers a shared texture for usage.
@@ -475,11 +471,11 @@ namespace advancedfx
 
                                     renderInfo.Type = RenderType.Normal;
 
-                                    UInt32 fbSurfaceID = (UInt32)pipeServer.ReadInt32(cancellationToken);
-                                    renderInfo.FbSurfaceID = 0 != fbSurfaceID ? new Nullable<UInt32>(fbSurfaceID) : null;
+                                    IntPtr fbSurfaceHandle = pipeServer.ReadHandle(cancellationToken);
+                                    renderInfo.FbSurfaceHandle = IntPtr.Zero != fbSurfaceHandle ? new Nullable<IntPtr>(fbSurfaceHandle) : null;
 
-                                    UInt32 fbDepthSurfaceID = (UInt32)pipeServer.ReadInt32(cancellationToken);
-                                    renderInfo.FbDepthSurfaceID = 0 != fbDepthSurfaceID ? new Nullable<UInt32>(fbDepthSurfaceID) : null;
+                                    IntPtr fbDepthSurfaceHandle = pipeServer.ReadHandle(cancellationToken);
+                                    renderInfo.FbDepthSurfaceHandle = IntPtr.Zero != fbDepthSurfaceHandle ? new Nullable<IntPtr>(fbDepthSurfaceHandle) : null;
 
                                     IFrameInfo frameInfo = null;
                                     bool frameInfoAvailable = pipeServer.ReadBoolean(cancellationToken);
@@ -579,15 +575,14 @@ namespace advancedfx
                                     SurfaceInfo surfaceInfo = new SurfaceInfo();
 
                                     // TextureId:
-                                    surfaceInfo.SurfaceID = (UInt32)pipeServer.ReadInt32(cancellationToken);
+                                    surfaceInfo.SharedHandle = pipeServer.ReadHandle(cancellationToken);
                                     surfaceInfo.Width = (UInt32)pipeServer.ReadInt32(cancellationToken);
                                     surfaceInfo.Height = (UInt32)pipeServer.ReadInt32(cancellationToken);
                                     surfaceInfo.Usage = (D3DUSAGE)(UInt32)pipeServer.ReadInt32(cancellationToken);
                                     surfaceInfo.Format = (D3DFORMAT)(UInt32)pipeServer.ReadInt32(cancellationToken);
                                     surfaceInfo.Pool = (D3DPOOL)(UInt32)pipeServer.ReadInt32(cancellationToken);
-                                    surfaceInfo.MultiSample = (D3DMULTISAMPLE_TYPE)(UInt32)pipeServer.ReadInt32(cancellationToken);
-                                    surfaceInfo.MultisampleQuality = (UInt32)pipeServer.ReadInt32(cancellationToken);
-                                    surfaceInfo.SharedHandle = pipeServer.ReadHandle(cancellationToken);
+                                    surfaceInfo.MultiSampleType = (D3DMULTISAMPLE_TYPE)(UInt32)pipeServer.ReadInt32(cancellationToken);
+                                    surfaceInfo.MultiSampleQuality = (UInt32)pipeServer.ReadInt32(cancellationToken);
 
                                     implementation.RegisterSurface(surfaceInfo);
                                 }
@@ -595,8 +590,8 @@ namespace advancedfx
 
                             case DrawingMessage.ReleaseSurface:
                                 {
-                                    UInt32 surfaceID = (UInt32)pipeServer.ReadInt32(cancellationToken);
-                                    implementation.ReleaseSurface(surfaceID);
+                                    IntPtr surfaceHandle = pipeServer.ReadHandle(cancellationToken);
+                                    implementation.ReleaseSurface(surfaceHandle);
 
                                     // Confirm the release to the client waiting:
 
