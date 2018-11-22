@@ -526,8 +526,6 @@ namespace advancedfx
                                         } while (null == frameInfo);
                                     }
 
-                                    // Rendering:
-
                                     implementation.Render(renderInfo);
 
                                     // Signal done (this is important so we can sync the drawing!):
