@@ -158,26 +158,51 @@ namespace advancedfx
             D3DUSAGE_DYNAMIC = 0x00000200
         }
 
+        public struct Afx4x4
+        {
+            public Single M00;
+            public Single M01;
+            public Single M02;
+            public Single M03;
+            public Single M10;
+            public Single M11;
+            public Single M12;
+            public Single M13;
+            public Single M20;
+            public Single M21;
+            public Single M22;
+            public Single M23;
+            public Single M30;
+            public Single M31;
+            public Single M32;
+            public Single M33;
+        }
+
         public interface IFrameInfo
         {
             Int32 FrameCount { get; }
             Single AbsoluteFrameTime { get; }
             Single CurTime { get; }
+            Afx4x4 WorldToScreenMatrix { get; }
         }
+
 
         private class FrameInfo : IFrameInfo
         {
             Int32 IFrameInfo.FrameCount { get { return m_FrameCount; } }
             Single IFrameInfo.AbsoluteFrameTime { get { return m_AbsoluteFrameTime; } }
             Single IFrameInfo.CurTime { get { return m_CurTime; } }
+            Afx4x4 IFrameInfo.WorldToScreenMatrix { get { return m_WorldToScreenMatrix; } }
 
             public Int32 FrameCount { get { return m_FrameCount; } set { m_FrameCount = value; } }
             public Single AbsoluteFrameTime { get { return m_AbsoluteFrameTime; } set { m_AbsoluteFrameTime = value; } }
             public Single CurTime { get { return m_CurTime; } set { m_CurTime = value; } }
+            public Afx4x4 WorldToScreenMatrix { get { return m_WorldToScreenMatrix; } set { m_WorldToScreenMatrix = value; } }
 
             Int32 m_FrameCount;
             Single m_AbsoluteFrameTime;
             Single m_CurTime;
+            Afx4x4 m_WorldToScreenMatrix;
         }
 
         public enum RenderType : int
@@ -186,26 +211,6 @@ namespace advancedfx
             Sky = 1,
             Normal = 2,
             Shadow = 3
-        }
-
-        public struct Afx4x4
-        {
-            Single M00;
-            Single M01;
-            Single M02;
-            Single M03;
-            Single M10;
-            Single M11;
-            Single M12;
-            Single M13;
-            Single M20;
-            Single M21;
-            Single M22;
-            Single M23;
-            Single M30;
-            Single M31;
-            Single M32;
-            Single M33;
         }
 
         public interface ITextureInfo
@@ -310,9 +315,6 @@ namespace advancedfx
             /// <remarks>Can be null if not available, so handle this.</remarks>
             Nullable<IntPtr> FbDepthSurfaceHandle { get; }
 
-            /// <remarks>Can be null if not available, so handle this.</remarks>
-            Nullable<Afx4x4> WorldToScreenMatrix { get; }
-
             /// <remarks>Can be null if not available, so handle this! Assume this to happen especially at start-up!</remarks>
             IFrameInfo FrameInfo { get; }
         }
@@ -322,20 +324,17 @@ namespace advancedfx
             RenderType IRenderInfo.Type { get { return m_Type; } }
             Nullable<IntPtr> IRenderInfo.FbSurfaceHandle { get { return m_FbSurfaceHandle; } }
             Nullable<IntPtr> IRenderInfo.FbDepthSurfaceHandle { get { return m_FbDepthSurfaceHandle; } }
-            Nullable<Afx4x4> IRenderInfo.WorldToScreenMatrix { get { return m_WorldToScreenMatrix; } }
             IFrameInfo IRenderInfo.FrameInfo { get { return m_FrameInfo; } }
 
             public RenderType Type { get { return m_Type; } set { m_Type = value; } }
             public Nullable<IntPtr> FbSurfaceHandle { get { return m_FbSurfaceHandle; } set { m_FbSurfaceHandle = value; } }
             public Nullable<IntPtr> FbDepthSurfaceHandle { get { return m_FbDepthSurfaceHandle; } set { m_FbDepthSurfaceHandle = value; } }
-            public Nullable<Afx4x4> WorldToScreenMatrix { get { return m_WorldToScreenMatrix; } set { m_WorldToScreenMatrix = value; } }
-            public FrameInfo FrameInfo { get { return m_FrameInfo; } set { m_FrameInfo = value; } }
+            public IFrameInfo FrameInfo { get { return m_FrameInfo; } set { m_FrameInfo = value; } }
 
             private RenderType m_Type;
             private Nullable<IntPtr> m_FbSurfaceHandle;
             private Nullable<IntPtr> m_FbDepthSurfaceHandle;
-            private Nullable<Afx4x4> m_WorldToScreenMatrix;
-            private FrameInfo m_FrameInfo;
+            private IFrameInfo m_FrameInfo;
         }
 
         public interface ILogging
@@ -480,11 +479,14 @@ namespace advancedfx
                                     renderInfo.FbDepthSurfaceHandle = IntPtr.Zero != fbDepthSurfaceHandle ? new Nullable<IntPtr>(fbDepthSurfaceHandle) : null;
 
                                     IFrameInfo frameInfo = null;
-                                    bool frameInfoAvailable = pipeServer.ReadBoolean(cancellationToken);
 
-                                    if (frameInfoAvailable)
+                                    Int32 frameCount = pipeServer.ReadInt32(cancellationToken);
+
+                                    Boolean frameInfoSent = pipeServer.ReadBoolean(cancellationToken);
+
+                                    if (frameInfoSent)
                                     {
-                                        Int32 frameCount = pipeServer.ReadInt32(cancellationToken);
+                                        // Frameinfo will become available soon, wait for it.
 
                                         do
                                         {
@@ -528,14 +530,9 @@ namespace advancedfx
                                         } while (null == frameInfo);
                                     }
 
-                                    try
-                                    {
-                                        implementation.Render(renderInfo);
-                                    }
-                                    catch (Exception e)
-                                    {
-                                        implementation.LogException(e);
-                                    }
+                                    renderInfo.FrameInfo = frameInfo;
+
+                                    implementation.Render(renderInfo);
 
                                     // Signal done (this is important so we can sync the drawing!):
                                     pipeServer.WriteBoolean(true, cancellationToken);
@@ -687,6 +684,7 @@ namespace advancedfx
             {
                 frameInfoQueue.Enqueue(frameInfo);
             }
+            frameInfoQueueEnqueued.Set();
         }
 
         private MyNamedPipeServer pipeServer = null;
@@ -905,8 +903,31 @@ namespace advancedfx
                                     FrameInfo frameInfo = new FrameInfo();
 
                                     frameInfo.FrameCount = pipeServer.ReadInt32(cancellationToken);
-                                    frameInfo.AbsoluteFrameTime = pipeServer.ReadFloat(cancellationToken);
-                                    frameInfo.CurTime = pipeServer.ReadFloat(cancellationToken);
+                                    frameInfo.AbsoluteFrameTime = pipeServer.ReadSingle(cancellationToken);
+                                    frameInfo.CurTime = pipeServer.ReadSingle(cancellationToken);
+
+                                    Afx4x4 worldToScreenMatrix;
+
+                                    worldToScreenMatrix.M00 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToScreenMatrix.M01 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToScreenMatrix.M02 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToScreenMatrix.M03 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToScreenMatrix.M10 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToScreenMatrix.M11 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToScreenMatrix.M12 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToScreenMatrix.M13 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToScreenMatrix.M20 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToScreenMatrix.M21 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToScreenMatrix.M22 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToScreenMatrix.M23 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToScreenMatrix.M30 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToScreenMatrix.M31 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToScreenMatrix.M32 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToScreenMatrix.M33 = pipeServer.ReadSingle(cancellationToken);
+
+                                    frameInfo.WorldToScreenMatrix = worldToScreenMatrix;
+
+                                    this.interOp.AddFrameInfo(frameInfo);
                                 }
                                 break;
                             case EngineMessage.EntityCreated:
@@ -1156,7 +1177,7 @@ namespace advancedfx
                 return System.Text.UnicodeEncoding.UTF8.GetString(ReadBytes(length, cancellationToken));
             }
 
-            public Single ReadFloat(CancellationToken cancellationToken)
+            public Single ReadSingle(CancellationToken cancellationToken)
             {
 
                 return BitConverter.ToSingle(ReadBytes(sizeof(Single), cancellationToken), 0);

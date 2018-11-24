@@ -31,8 +31,8 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
             Debug.LogError("AfxHookUnity.dll is not injected. It needs to be injected into Unity early.");
         }
 
-        if (!AfxHookUnityStatus())
-            Debug.LogError("AfxHookUnityInit failed.");
+        if (!AfxHookUnityInit(0))
+            Debug.LogError("AfxHookUnityInit failed (version mismatch or init failed).");
 
         Application.runInBackground = true; // don't sleep when not having focus
         QualitySettings.vSyncCount = 0; // render as fast as possible
@@ -84,10 +84,51 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
     void advancedfx.Interop.IImplementation.ConnectionLost() {
 
         ReleaseSurfaces();
+
+        deltaTime = 0;
     }
 
     void advancedfx.Interop.IImplementation.Render (advancedfx.Interop.IRenderInfo renderInfo) {
-		Camera cam = GetComponent<Camera> ();
+
+        if (null != renderInfo.FrameInfo && 0 != renderInfo.FrameInfo.AbsoluteFrameTime)
+        {
+            double time = deltaTime + renderInfo.FrameInfo.AbsoluteFrameTime;
+
+            double absTime = Math.Max(0.0, time);
+
+            int frameRate = 0.0 != absTime ? (int)Math.Floor(1.0 / absTime) : 0 ;
+
+            if(0 < frameRate)
+            {
+                Time.timeScale = 1;
+                Time.captureFramerate = frameRate;
+
+                Debug.Log(Time.captureFramerate);
+            }
+            else
+            {
+                // Can't go back in time, so pause.
+                Time.timeScale = 0;
+                Time.captureFramerate = 0;
+            }
+
+            deltaTime = time - (absTime - (0 != frameRate ?  1.0 / frameRate : 0));
+
+            if(1 < Math.Abs(deltaTime))
+            {
+                Debug.LogError("Clock is one second off, resetting.");
+                deltaTime = 0;
+            }
+        }
+        else
+        {
+            Debug.Log("No time info available.");
+
+            Time.timeScale = 1;
+            Time.captureFramerate = 0;
+        }
+
+        Camera cam = GetComponent<Camera> ();
 
         if (null == cam)
         {
@@ -177,7 +218,7 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
     public static extern IntPtr GetModuleHandle(string lpModuleName);
 
     [DllImport ("AfxHookUnity")]
-	private static extern bool AfxHookUnityStatus ();
+	private static extern bool AfxHookUnityInit(int version);
 
 	[DllImport ("AfxHookUnity")]
 	private static extern void AfxHookUnityBeginCreateRenderTexture (IntPtr fbSharedHandle, IntPtr fbDepthSharedHandle);
@@ -202,6 +243,8 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 		public readonly IntPtr FbSurfaceHandle;
         public readonly IntPtr FbDepthSurfaceHandle;
 	}
+
+    private double deltaTime = 0.0;
 
     private Dictionary<RenderTextureKey, RenderTexture> renderTextures = new Dictionary<RenderTextureKey, RenderTexture> ();
 	private Dictionary<IntPtr, List<RenderTextureKey>> surfaceHandleToRenderTextureKeys = new Dictionary<IntPtr, List<RenderTextureKey>>();
