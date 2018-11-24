@@ -113,6 +113,8 @@ namespace advancedfx
             D3DFMT_BINARYBUFFER = 199,
             //#endif // !D3D_DISABLE_9EX
 
+            D3DFMT_INTZ = 1515474505,
+
             //D3DFMT_FORCE_DWORD          =0x7fffffff
         };
 
@@ -526,7 +528,14 @@ namespace advancedfx
                                         } while (null == frameInfo);
                                     }
 
-                                    implementation.Render(renderInfo);
+                                    try
+                                    {
+                                        implementation.Render(renderInfo);
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        implementation.LogException(e);
+                                    }
 
                                     // Signal done (this is important so we can sync the drawing!):
                                     pipeServer.WriteBoolean(true, cancellationToken);

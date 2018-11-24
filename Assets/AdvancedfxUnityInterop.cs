@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImplementation
 {
@@ -33,10 +34,8 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
         if (!AfxHookUnityStatus())
             Debug.LogError("AfxHookUnityInit failed.");
 
-        Application.runInBackground = true;
-        QualitySettings.vSyncCount = 0;
-
-
+        Application.runInBackground = true; // don't sleep when not having focus
+        QualitySettings.vSyncCount = 0; // render as fast as possible
 
         interOp = new advancedfx.Interop(this);
         interOp.PipeName = pipeName;
@@ -45,6 +44,11 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
     }
 
     public void OnEnable() {
+        CommandBuffer commandBuffer = new CommandBuffer();
+        commandBuffer.name = "AfxHookUnityWaitForGPU synchronization";
+        commandBuffer.IssuePluginEvent(GetRenderEventFunc(), 1);
+        GetComponent<Camera>().AddCommandBuffer(CameraEvent.AfterEverything, commandBuffer);
+
         interOp.OnEnable();
     }
 
@@ -61,13 +65,6 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
         GL.InvalidateState();
     }
 
-    public void OnPostRender()
-    {
-        GL.Flush();
-        AfxHookUnityWaitForGPU();
-        m_RenderingFinished.Set();
-    }
-
     public void Update()
     {
         interOp.Update();
@@ -81,7 +78,7 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
     }
 
     void advancedfx.Interop.ILogging.LogException(Exception exception) {
-        Debug.Log(exception, this);
+        Debug.LogError(exception, this);
     }
 
     void advancedfx.Interop.IImplementation.ConnectionLost() {
@@ -124,17 +121,12 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 			{
                     AfxHookUnityBeginCreateRenderTexture(renderInfo.FbSurfaceHandle.Value, renderInfo.FbDepthSurfaceHandle.Value);
 
-                    //var currentRT = RenderTexture.active;
-
-                    //cam.depthTextureMode = DepthTextureMode.Depth;
                     cam.targetTexture = renderTexture;
 
-                    //RenderTexture.active = cam.targetTexture;
-
+                    renderTexture.Create();
                     cam.Render ();
-                    m_RenderingFinished.WaitOne();
 
-                    //RenderTexture.active = currentRT;
+                    AfxHookUnityWaitOne();
 
                     cam.targetTexture = null;
 
@@ -168,8 +160,6 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
     //
     // Private:
 
-    private AutoResetEvent m_RenderingFinished = new AutoResetEvent(false);
-
     private advancedfx.Interop interOp;
 
     [StructLayout(LayoutKind.Sequential)] // Be aware of 32 bit vs 64 bit here, LayoutKind.Explicit is tricky.
@@ -196,8 +186,10 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 	private static extern void AfxHookUnityEndCreateRenderTexture ();
 
     [DllImport("AfxHookUnity")]
-    private static extern void AfxHookUnityWaitForGPU();
+    private static extern IntPtr GetRenderEventFunc();
 
+    [DllImport("AfxHookUnity")]
+    private static extern void AfxHookUnityWaitOne();
 
     private struct RenderTextureKey
 	{
@@ -234,12 +226,11 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 		if (!rdesc.HasValue)
 			return null;
 
-		//AfxHookUnityBeginCreateRenderTexture (fbSurfaceInfo.SharedHandle, fbDepthSurfaceInfo.SharedHandle);
+		AfxHookUnityBeginCreateRenderTexture (fbSurfaceInfo.SharedHandle, fbDepthSurfaceInfo.SharedHandle);
 
 		renderTexture = new RenderTexture (rdesc.Value);       
-        //renderTexture.Create ();
 
-        //AfxHookUnityEndCreateRenderTexture ();
+        AfxHookUnityEndCreateRenderTexture ();
 
         renderTextures [key] = renderTexture;
 
@@ -317,6 +308,9 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
                 desc.depthBufferBits = 32;
                 break;
             case advancedfx.Interop.D3DFORMAT.D3DFMT_D32_LOCKABLE:
+                desc.depthBufferBits = 32;
+                break;
+            case advancedfx.Interop.D3DFORMAT.D3DFMT_INTZ:
                 desc.depthBufferBits = 32;
                 break;
             default:
