@@ -288,7 +288,7 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 
                         //Debug.Log(verticalFovDeg);
 
-                        cam.fieldOfView = fov;
+                        cam.fieldOfView = verticalFovDeg;
                     }
 
                     CommandBuffer afxWait = new CommandBuffer();
