@@ -183,6 +183,9 @@ namespace advancedfx
             Int32 FrameCount { get; }
             Single AbsoluteFrameTime { get; }
             Single CurTime { get; }
+            Int32 Width { get; }
+            Int32 Height { get; }
+            Afx4x4 WorldToViewMatrix { get; }
             Afx4x4 WorldToScreenMatrix { get; }
         }
 
@@ -192,16 +195,25 @@ namespace advancedfx
             Int32 IFrameInfo.FrameCount { get { return m_FrameCount; } }
             Single IFrameInfo.AbsoluteFrameTime { get { return m_AbsoluteFrameTime; } }
             Single IFrameInfo.CurTime { get { return m_CurTime; } }
+            Int32 IFrameInfo.Width { get { return m_Width; } }
+            Int32 IFrameInfo.Height { get { return m_Height; } }
+            Afx4x4 IFrameInfo.WorldToViewMatrix { get { return m_WorldToViewMatrix; } }
             Afx4x4 IFrameInfo.WorldToScreenMatrix { get { return m_WorldToScreenMatrix; } }
 
             public Int32 FrameCount { get { return m_FrameCount; } set { m_FrameCount = value; } }
             public Single AbsoluteFrameTime { get { return m_AbsoluteFrameTime; } set { m_AbsoluteFrameTime = value; } }
             public Single CurTime { get { return m_CurTime; } set { m_CurTime = value; } }
+            public Int32 Width { get { return m_Width; } set { m_Width = value; } }
+            public Int32 Height { get { return m_Height; } set { m_Height = value; } }
+            public Afx4x4 WorldToViewMatrix { get { return m_WorldToViewMatrix; } set { m_WorldToViewMatrix = value; } }
             public Afx4x4 WorldToScreenMatrix { get { return m_WorldToScreenMatrix; } set { m_WorldToScreenMatrix = value; } }
 
             Int32 m_FrameCount;
             Single m_AbsoluteFrameTime;
             Single m_CurTime;
+            Int32 m_Width;
+            Int32 m_Height;
+            Afx4x4 m_WorldToViewMatrix;
             Afx4x4 m_WorldToScreenMatrix;
         }
 
@@ -532,7 +544,14 @@ namespace advancedfx
 
                                     renderInfo.FrameInfo = frameInfo;
 
-                                    implementation.Render(renderInfo);
+                                    try
+                                    {
+                                        implementation.Render(renderInfo);
+                                    }
+                                    catch(Exception e)
+                                    {
+                                        implementation.LogException(e);
+                                    }
 
                                     // Signal done (this is important so we can sync the drawing!):
                                     pipeServer.WriteBoolean(true, cancellationToken);
@@ -906,7 +925,31 @@ namespace advancedfx
                                     frameInfo.AbsoluteFrameTime = pipeServer.ReadSingle(cancellationToken);
                                     frameInfo.CurTime = pipeServer.ReadSingle(cancellationToken);
 
-                                    Afx4x4 worldToScreenMatrix;
+                                    frameInfo.Width = pipeServer.ReadInt32(cancellationToken);
+                                    frameInfo.Height = pipeServer.ReadInt32(cancellationToken);
+
+                                    Afx4x4 worldToViewMatrix = new Afx4x4();
+
+                                    worldToViewMatrix.M00 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToViewMatrix.M01 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToViewMatrix.M02 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToViewMatrix.M03 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToViewMatrix.M10 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToViewMatrix.M11 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToViewMatrix.M12 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToViewMatrix.M13 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToViewMatrix.M20 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToViewMatrix.M21 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToViewMatrix.M22 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToViewMatrix.M23 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToViewMatrix.M30 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToViewMatrix.M31 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToViewMatrix.M32 = pipeServer.ReadSingle(cancellationToken);
+                                    worldToViewMatrix.M33 = pipeServer.ReadSingle(cancellationToken);
+
+                                    frameInfo.WorldToViewMatrix = worldToViewMatrix;
+
+                                    Afx4x4 worldToScreenMatrix = new Afx4x4();
 
                                     worldToScreenMatrix.M00 = pipeServer.ReadSingle(cancellationToken);
                                     worldToScreenMatrix.M01 = pipeServer.ReadSingle(cancellationToken);
