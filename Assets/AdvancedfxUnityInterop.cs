@@ -79,6 +79,15 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 
         interOp = new advancedfx.Interop(this);
         interOp.PipeName = pipeName;
+
+        Camera cam = GetComponent<Camera>();
+
+        if (null != cam)
+        {
+            cam.allowHDR = false;
+            cam.allowMSAA = false;
+            cam.allowDynamicResolution = false;
+        }
     }
 
     public void OnEnable() {
@@ -258,7 +267,7 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
                         float C = unityProjection[2, 2]; // - (f+n) /(f-n)
                         float D = unityProjection[2, 3]; // - 2*f*n / (f-n)
 
-                        Debug.Log(D / (C - 1)+" / "+D / (C + 1));
+                        //Debug.Log(D / (C - 1)+" / "+D / (C + 1));
 
                         cam.nearClipPlane = D / (C - 1);
                         cam.farClipPlane = D / (C + 1);
@@ -267,6 +276,7 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
                         cam.farClipPlane = 1;
 
                         cam.pixelRect = new Rect(0, 0, width, height);
+                        cam.rect = new Rect(0, 0, width, height);
 
                         Matrix4x4 d3dToScreen = new Matrix4x4();
                         d3dToScreen[0, 0] = 1; d3dToScreen[0, 1] = 0; d3dToScreen[0, 2] = 0; d3dToScreen[0, 3] = 0;

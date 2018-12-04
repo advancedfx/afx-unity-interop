@@ -1,8 +1,9 @@
 # Test version
 
-Usage:
-
+- Tested with Unity 2018.2.18f1.
 - Needs HLAE 2.57.0 (2018-12-03T16:24Z) or newer.
+
+Usage:
 
 1) Use HLAE CustomLoader to inject AfxHookUnity.dll into the Unity.exe and open the example project.
 

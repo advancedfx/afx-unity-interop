@@ -518,13 +518,14 @@ namespace advancedfx
                                             {
                                                 while (0 < frameInfoQueue.Count)
                                                 {
-                                                    IFrameInfo curFrameInfo = frameInfoQueue.Dequeue();
+                                                    IFrameInfo curFrameInfo = frameInfoQueue.Peek();
 
                                                     Int32 cmp = frameCount - curFrameInfo.FrameCount;
 
                                                     if (cmp > 0)
                                                     {
                                                         // This is an old info, skip
+                                                        frameInfoQueue.Dequeue();
                                                     }
                                                     else if (cmp < 0)
                                                     {
@@ -535,6 +536,7 @@ namespace advancedfx
                                                     {
                                                         // Exactly right info, let's go!
                                                         frameInfo = curFrameInfo;
+                                                        frameInfoQueue.Dequeue();
                                                         break;
                                                     }
                                                 }
@@ -852,7 +854,7 @@ namespace advancedfx
                 LevelInitPreEntity = 1,
                 LevelShutDown = 2,
                 BeforeFrameStart = 3,
-                BeforeFrameRenderStart = 4,
+                BeforeHud = 4,
                 AfterFrameRenderEnd = 5,
                 EntityCreated = 6,
                 EntityDeleted = 7
@@ -917,7 +919,7 @@ namespace advancedfx
                                     pipeServer.Flush(cancellationToken);
                                 }
                                 break;
-                            case EngineMessage.BeforeFrameRenderStart:
+                            case EngineMessage.BeforeHud:
                                 {
                                     FrameInfo frameInfo = new FrameInfo();
 
