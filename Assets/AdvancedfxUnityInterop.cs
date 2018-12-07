@@ -177,13 +177,13 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
             Debug.LogError("Back buffer unknown.");
             return;
         }
-        if(!renderInfo.FbDepthSurfaceHandle.HasValue)
-        {
-            Debug.LogError("Depth stencil unknown.");
-            return;
-        }
+        //if(!renderInfo.FbDepthSurfaceHandle.HasValue)
+        //{
+        //    Debug.LogError("Depth stencil unknown.");
+        //    return;
+        //}
 
-        RenderTexture renderTexture = GetRenderTexture(renderInfo.FbSurfaceHandle.Value, renderInfo.FbDepthSurfaceHandle.Value);
+        RenderTexture renderTexture = GetRenderTexture(renderInfo.FbSurfaceHandle.Value, renderInfo.FbDepthSurfaceHandle.HasValue ? renderInfo.FbDepthSurfaceHandle.Value : IntPtr.Zero);
 
         if (null == renderTexture)
         {
@@ -409,9 +409,10 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 			return renderTexture;
 
         advancedfx.Interop.ISurfaceInfo fbSurfaceInfo;
-        advancedfx.Interop.ISurfaceInfo fbDepthSurfaceInfo;
+        advancedfx.Interop.ISurfaceInfo fbDepthSurfaceInfo = null;
 
-		if (!(surfaceHandleToSurfaceInfo.TryGetValue (fbSurfaceHandle, out fbSurfaceInfo) && surfaceHandleToSurfaceInfo.TryGetValue (fbDepthSufaceHandle, out fbDepthSurfaceInfo)))
+        if (!(surfaceHandleToSurfaceInfo.TryGetValue(fbSurfaceHandle, out fbSurfaceInfo)))
+        //if (!(surfaceHandleToSurfaceInfo.TryGetValue (fbSurfaceHandle, out fbSurfaceInfo) && surfaceHandleToSurfaceInfo.TryGetValue (fbDepthSufaceHandle, out fbDepthSurfaceInfo)))
 			return null;
 
 		Nullable<RenderTextureDescriptor> rdesc = GetRenderTextureDescriptor (fbSurfaceInfo, fbDepthSurfaceInfo);
@@ -430,18 +431,19 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 		}
 		list.Add (key);
 
-		list = null;
-		if (!surfaceHandleToRenderTextureKeys.TryGetValue (fbDepthSufaceHandle, out list)) {
-			list = new List<RenderTextureKey>();
-            surfaceHandleToRenderTextureKeys[fbDepthSufaceHandle] = list;
-		}
-		list.Add (key);
+		//list = null;
+		//if (!surfaceHandleToRenderTextureKeys.TryGetValue (fbDepthSufaceHandle, out list)) {
+		//	list = new List<RenderTextureKey>();
+        //    surfaceHandleToRenderTextureKeys[fbDepthSufaceHandle] = list;
+		//}
+		//list.Add (key);
 
 		return renderTexture;
 	}
 
 	private Nullable<RenderTextureDescriptor> GetRenderTextureDescriptor(advancedfx.Interop.ISurfaceInfo fbSurfaceInfo, advancedfx.Interop.ISurfaceInfo fbDepthSurfaceInfo)
-	{
+    {
+        /*
         if (
             fbSurfaceInfo.Width != fbDepthSurfaceInfo.Width
             || fbSurfaceInfo.Height != fbDepthSurfaceInfo.Height
@@ -450,6 +452,7 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
             Debug.LogError("Back buffer and depth stencil dimensions don't match");
             return null;
         }
+        */
 
         RenderTextureDescriptor desc = new RenderTextureDescriptor((int)fbSurfaceInfo.Width, (int)fbSurfaceInfo.Height);
 
@@ -477,6 +480,7 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
                 return null;
         }
 
+        /*
         Debug.Log("GetRenderTextureDescriptor depth stencil: "+ fbDepthSurfaceInfo.Format + " (" + fbDepthSurfaceInfo.Width + "," + fbDepthSurfaceInfo.Height + ")");
 
         switch (fbDepthSurfaceInfo.Format) // these might be wrong:
@@ -506,6 +510,8 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
                 Debug.LogError("Unknown depth stencil format: " + fbDepthSurfaceInfo.Format);
                 return null;
         }
+        */
+        desc.depthBufferBits = 32;
 
         desc.autoGenerateMips = false;
         desc.bindMS = false;
