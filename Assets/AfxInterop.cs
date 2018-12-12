@@ -181,8 +181,22 @@ namespace advancedfx
         public interface IFrameInfo
         {
             Int32 FrameCount { get; }
+
+            /// <summary>
+            /// Unpaused client frame time.
+            /// </summary>
             Single AbsoluteFrameTime { get; }
+
+            /// <summary>
+            /// Client game time.
+            /// </summary>
             Single CurTime { get; }
+
+            /// <summary>
+            /// Client frame time (can be 0 e.g. if paused).
+            /// </summary>
+            Single FrameTime { get; }
+
             Int32 Width { get; }
             Int32 Height { get; }
             Afx4x4 WorldToViewMatrix { get; }
@@ -195,6 +209,7 @@ namespace advancedfx
             Int32 IFrameInfo.FrameCount { get { return m_FrameCount; } }
             Single IFrameInfo.AbsoluteFrameTime { get { return m_AbsoluteFrameTime; } }
             Single IFrameInfo.CurTime { get { return m_CurTime; } }
+            Single IFrameInfo.FrameTime { get { return m_FrameTime; } }
             Int32 IFrameInfo.Width { get { return m_Width; } }
             Int32 IFrameInfo.Height { get { return m_Height; } }
             Afx4x4 IFrameInfo.WorldToViewMatrix { get { return m_WorldToViewMatrix; } }
@@ -203,6 +218,7 @@ namespace advancedfx
             public Int32 FrameCount { get { return m_FrameCount; } set { m_FrameCount = value; } }
             public Single AbsoluteFrameTime { get { return m_AbsoluteFrameTime; } set { m_AbsoluteFrameTime = value; } }
             public Single CurTime { get { return m_CurTime; } set { m_CurTime = value; } }
+            public Single FrameTime { get { return m_FrameTime; } set { m_FrameTime = value; } }
             public Int32 Width { get { return m_Width; } set { m_Width = value; } }
             public Int32 Height { get { return m_Height; } set { m_Height = value; } }
             public Afx4x4 WorldToViewMatrix { get { return m_WorldToViewMatrix; } set { m_WorldToViewMatrix = value; } }
@@ -211,6 +227,7 @@ namespace advancedfx
             Int32 m_FrameCount;
             Single m_AbsoluteFrameTime;
             Single m_CurTime;
+            Single m_FrameTime;
             Int32 m_Width;
             Int32 m_Height;
             Afx4x4 m_WorldToViewMatrix;
@@ -349,6 +366,44 @@ namespace advancedfx
             private IFrameInfo m_FrameInfo;
         }
 
+        public interface ICommand
+        {
+            String this[int index] { get; }
+            int Count { get;  }
+        }
+
+        public class Command : ICommand
+        {
+            String ICommand.this[int index] { get { return m_Args[index]; } }
+            int ICommand.Count { get { return m_Args.Count; } }
+
+            public void AddArg(String arg)
+            {
+                m_Args.Add(arg);
+            }
+
+            private List<String> m_Args = new List<String>();
+        }
+
+        public interface ICommandArray
+        {
+            ICommand this[int index] { get; }
+            int Count { get; }
+        }
+
+        public class CommandArray : ICommandArray
+        {
+            ICommand ICommandArray.this[int index] { get { return m_Cmds[index]; } }
+            int ICommandArray.Count { get { return m_Cmds.Count; } }
+
+            public void AddCmd(Command cmd)
+            {
+                m_Cmds.Add(cmd);
+            }
+
+            private List<Command> m_Cmds = new List<Command>();
+        }
+
         public interface ILogging
         {
             /// <remarks>Must be threadsafe!</remarks>
@@ -396,6 +451,20 @@ namespace advancedfx
             /// <param name="textureId">The ID of the texture.</param>
             /// <remarks>This is currently not used!</remarks>
             void ReleaseTexture(UInt32 textureId);
+
+            /// <summary>
+            /// Warning, you are reponsible for the thread syncronization required!<br />
+            /// Command batch from the client engine thread.
+            /// These are sent and received before the current network frame is renderred.
+            /// </summary>
+            /// <param name="commands">
+            ///  Commands sent from client. Commands that have "afx" as first argument are reserved for internal will not be passed through to you.
+            ///  It will be empty when the client sent no commands.
+            ///  </param>
+            ///  <returns>
+            ///  null for no reply or command strings to reply (will be executed in client console).
+            ///  </returns>
+            IList<String> EngineThreadCommands(ICommandArray commands);
         }
 
         public Interop(IImplementation implementation)
@@ -670,7 +739,7 @@ namespace advancedfx
 
         private IImplementation implementation;
 
-        private const Int32 version = 0;
+        private const Int32 version = 1;
         private string pipeName = "advancedfxInterop";
 
         bool waitingForConnection = false;
@@ -871,12 +940,8 @@ namespace advancedfx
             private MyNamedPipeServer pipeServer = null;
             private Thread thread = null;
 
-            private Queue<String> commandQueue = new Queue<String>();
-
              private void ThreadWorker()
             {
-                bool messageSent = false;
-
                 try
                 {
                     while (!cancellationToken.IsCancellationRequested && !pipeServer.Connect())
@@ -892,27 +957,41 @@ namespace advancedfx
                         {
                             case EngineMessage.BeforeFrameStart:
                                 {
-                                    lock (commandQueue)
+                                    // Read incoming commands from client:
+
+                                    CommandArray commands = new CommandArray();
+
+                                    UInt32 commandCount = pipeServer.ReadCompressedUInt32(cancellationToken);
+
+                                    while (0 < commandCount)
                                     {
-                                        if (!messageSent)
+                                        Command command = new Command();
+
+                                        UInt32 argCount = pipeServer.ReadCompressedUInt32(cancellationToken);
+
+                                        while (0 < argCount)
                                         {
-                                            messageSent = true;
-                                            commandQueue.Enqueue("echo ---- Hello World from afx-unity-interop! ----");
+                                            command.AddArg(pipeServer.ReadUTF8String(cancellationToken));
+
+                                            --argCount;
                                         }
 
-                                        if (commandQueue.Count < 255)
-                                        {
-                                            pipeServer.WriteByte((Byte)commandQueue.Count, cancellationToken);
-                                        }
-                                        else
-                                        {
-                                            pipeServer.WriteByte(255, cancellationToken);
-                                            pipeServer.WriteInt32(commandQueue.Count, cancellationToken);
-                                        }
+                                        commands.AddCmd(command);
 
-                                        while (0 < commandQueue.Count)
+                                        --commandCount;
+                                    }
+
+                                    IList<String> reply = interOp.implementation.EngineThreadCommands(commands);
+                                    if(null == reply)
+                                    {
+                                        pipeServer.WriteCompressedUInt32(0, cancellationToken);
+                                    }
+                                    else
+                                    {
+                                        pipeServer.WriteCompressedUInt32((UInt32)reply.Count, cancellationToken);
+                                        for(int i=0; i < reply.Count; ++i)
                                         {
-                                            pipeServer.WriteStringUTF8(commandQueue.Dequeue(), cancellationToken);
+                                            pipeServer.WriteStringUTF8(reply[i], cancellationToken);
                                         }
                                     }
 
@@ -926,6 +1005,7 @@ namespace advancedfx
                                     frameInfo.FrameCount = pipeServer.ReadInt32(cancellationToken);
                                     frameInfo.AbsoluteFrameTime = pipeServer.ReadSingle(cancellationToken);
                                     frameInfo.CurTime = pipeServer.ReadSingle(cancellationToken);
+                                    frameInfo.FrameTime = pipeServer.ReadSingle(cancellationToken);
 
                                     frameInfo.Width = pipeServer.ReadInt32(cancellationToken);
                                     frameInfo.Height = pipeServer.ReadInt32(cancellationToken);
@@ -1206,18 +1286,44 @@ namespace advancedfx
                 return ReadBytes(sizeof(Byte), cancellationToken)[0];
             }
 
+            public SByte ReadSByte(CancellationToken cancellationToken)
+            {
+                return (SByte)ReadByte( cancellationToken);
+            }
+
+            public UInt32 ReadUInt32(CancellationToken cancellationToken)
+            {
+                return BitConverter.ToUInt32(ReadBytes(sizeof(UInt32), cancellationToken), 0);
+            }
+
+            public UInt32 ReadCompressedUInt32(CancellationToken cancellationToken)
+            {
+                Byte value = ReadByte(cancellationToken);
+
+                if (value < Byte.MaxValue)
+                    return value;
+
+                return ReadUInt32(cancellationToken);
+            }
+
             public Int32 ReadInt32(CancellationToken cancellationToken)
             {
-
                 return BitConverter.ToInt32(ReadBytes(sizeof(Int32), cancellationToken), 0);
+            }
+
+            public Int32 ReadCompressedInt32(CancellationToken cancellationToken)
+            {
+                SByte value = ReadSByte(cancellationToken);
+
+                if (value < SByte.MaxValue)
+                    return value;
+
+                return ReadInt32(cancellationToken);
             }
 
             public String ReadUTF8String(CancellationToken cancellationToken)
             {
-
-                byte[] result = ReadBytes(1, cancellationToken);
-
-                int length = result[0] < 255 ? result[0] : ReadInt32(cancellationToken);
+                int length = (int)ReadCompressedUInt32(cancellationToken);
 
                 return System.Text.UnicodeEncoding.UTF8.GetString(ReadBytes(length, cancellationToken));
             }
@@ -1308,10 +1414,47 @@ namespace advancedfx
                 WriteBytes(new Byte[1] { value }, cancellationToken);
             }
 
+            public void WriteSByte(SByte value, CancellationToken cancellationToken)
+            {
+                WriteByte((Byte)value, cancellationToken);
+            }
+
+            public void WriteUInt32(UInt32 value, CancellationToken cancellationToken)
+            {
+
+                WriteBytes(BitConverter.GetBytes(value), cancellationToken);
+            }
+
+            public void WriteCompressedUInt32(UInt32 value, CancellationToken cancellationToken)
+            {
+                if(Byte.MinValue <= value && value <= Byte.MaxValue -1)
+                {
+                    WriteByte((Byte)value, cancellationToken);
+                }
+                else
+                {
+                    WriteByte(Byte.MaxValue, cancellationToken);
+                    WriteUInt32(value, cancellationToken);
+                }
+            }
+
             public void WriteInt32(Int32 value, CancellationToken cancellationToken)
             {
 
                 WriteBytes(BitConverter.GetBytes(value), cancellationToken);
+            }
+
+            public void WriteCompressedInt32(Int32 value, CancellationToken cancellationToken)
+            {
+                if(SByte.MinValue <= value && value <= SByte.MaxValue - 1)
+                {
+                    WriteSByte((SByte)value, cancellationToken);
+                }
+                else
+                {
+                    WriteSByte(SByte.MaxValue, cancellationToken);
+                    WriteInt32(value, cancellationToken);
+                }
             }
 
             public void WriteHandle(IntPtr value, CancellationToken cancellationToken)
@@ -1322,19 +1465,9 @@ namespace advancedfx
 
             public void WriteStringUTF8(String value, CancellationToken cancellationToken)
             {
-
                 byte[] bytes = System.Text.UnicodeEncoding.UTF8.GetBytes(value);
 
-                if (bytes.Length < 255)
-                {
-                    WriteByte((byte)bytes.Length, cancellationToken);
-                }
-                else
-                {
-                    WriteByte(255, cancellationToken);
-                    WriteInt32(bytes.Length, cancellationToken);
-                }
-
+                WriteCompressedUInt32((UInt32)bytes.Length, cancellationToken);
                 WriteBytes(bytes, cancellationToken);
             }
 

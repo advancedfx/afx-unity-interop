@@ -8,37 +8,41 @@ using UnityEngine.Rendering;
 
 /*
  
-QuakeTRS
-= /[cos(quakeZ)*cos(quakeY)] * S(quakeX), [cos(quakeZ)*sin(quakeY)*sin(quakeX) -sin(quakeZ)*cos(quakeX)] * S(quakeY), [cos(quakeZ)*sin(quakeY)*cos(quakeX) +sin(quakeZ)*sin(quakeX)]  * S(quakeZ), T(quakeX)\
-  |[sin(quakeZ)*cos(quakeY)] * S(quakeX), [sin(quakeZ)*sin(quakeY)*sin(quakeX) +cos(quakeZ)*cos(quakeX)] * S(quakeY), [sin(quakeZ)*sin(quakeY)*cos(quakeX) +cos(quakeZ)*-sin(quakeX)] * S(quakeZ), T(quakeY)|
-  |[-sin(quakeY)]            * S(quakeX), [cos(quakeY)*sin(quakeX)]                                      * S(quakeY), [cos(quakeY)*cos(quakeX)]                                       * S(quakeZ), T(quakeZ)|
-  \0                                    , 0                                                                         , 0                                                                          , 1        /
+QuakeRoll(r) =
+/ 1,  0,   0, 0 \
+| 0, cr, -sr, 0 |
+| 0, sr,  cr, 0 |
+\ 0,  0,   0, 1 /
 
-UnityTRS
-= /[cos(unityZ)*cos(unityY)] * S(unityX), [sin(unitytY)*cos(unityX) + cos(unityZ) * -sin(unityY) * -sin(unityX)] * S(unityY), [sin(unityY) * sin(unityX) + cos(unityZ) * -sin(unityY) * cos(unityX)] * S(unityZ), T(unityX)\
-  |[-sin(unityZ)*cos(unitY)] * S(unityX), [cos(unityY)*cos(unityX) - sin(unityZ) * -sin(unityY) * -sin(unityX)]  * S(unityY), [cos(unityY) * sin(unityX) - sin(unityZ) * -sin(unityY) * cos(unityX)] * S(unityZ), T(unityY)|
-  |[sin(unityY)]             * S(unityX), [cos(unityZ) * -sin(unityX)]                                           * S(unityY), [cos(unityZ) * cos(unityX)]                                            * S(unityZ), T(unityZ)|
-  \0                                    , 0                                                                                 , 0                                                                                 ,         1/
+QuakePitch(p) =
+/ cp, 0, sp, 0 \
+|  0, 1,  0, 0 |
+|-sp, 0, cp, 0 |
+\  0, 0,  0, 1 /
 
-UnityTRS * 254 * unityX = -QuakeTRS * quakeY
-UnityTRS * 254 * unityY =  QuakeTRS * quakeZ
-UnityTRS * 254 * unityZ =  QuakeTRS * quakeX
+QuakeYaw(y) =
+/ cy, -sy, 0, 0 \
+| sy,  cy, 0, 0 |
+|  0,   0, 1, 0 |
+\  0,   0, 0, 1 /
 
-QuakeTRS * U2Q * (unityX, unityY, unityZ, 1)^T = UnityTRS * (unityX, unityY, unityZ, 1)^T
+QuakeScale(a,b,c) =
+/ a, 0, 0, 0 \
+| 0, b, 0, 0 |
+| 0, 0, c, 0 |
+\ 0, 0, 0, 1 /
 
-----
+QuakeTranslate(u,v,w) =
+/ 1, 0, 0, u \
+| 0, 1, 0, v |
+| 0, 0, 1, w |
+\ 0, 0, 0, 1 /
 
-(quakeX, quakeY, quakeZ, 1)^T
-= U2Q * (unityX, unityY, unityZ, 1)^T = (QuakeTRS)^(-1) * UnityTRS * (unityX, unityY, unityZ, 1)^T
+QuakeRTS = QuakeYaw(y) * QuakePitch(p) * QuakeRoll(r) * QuakeTranslate(u,v,w) * QuakeScale(a,b,c)
 
-Qinv = (QuakeTRS)^(-1)
-
-0 = (QuakeTRS * U2Q - UnityTRS) * (unityX, unityY, unityZ, 1)^T
-
-= /[cos(quakeZ)*cos(quakeY)] * S(quakeX), [cos(quakeZ)*sin(quakeY)*sin(quakeX) -sin(quakeZ)*cos(quakeX)] * S(quakeY), [cos(quakeZ)*sin(quakeY)*cos(quakeX) +sin(quakeZ)*sin(quakeX)]  * S(quakeZ), T(quakeX)\
-  |[sin(quakeZ)*cos(quakeY)] * S(quakeX), [sin(quakeZ)*sin(quakeY)*sin(quakeX) +cos(quakeZ)*cos(quakeX)] * S(quakeY), [sin(quakeZ)*sin(quakeY)*cos(quakeX) +cos(quakeZ)*-sin(quakeX)] * S(quakeZ), T(quakeY)|
-  |[-sin(quakeY)]            * S(quakeX), [cos(quakeY)*sin(quakeX)]                                      * S(quakeY), [cos(quakeY)*cos(quakeX)]                                       * S(quakeZ), T(quakeZ)|
-  \0                                    , 0                                                                         , 0                                                                          , 1        /
+u =  100 / 2.54 * unityZ
+v = -100 / 2.54 * unityX
+w =  100 / 2.54 * unityY
 
 */
 
@@ -46,7 +50,7 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 {
     public string pipeName = "advancedfxInterop";
 
-    public Int32 offset = 0;
+    public volatile bool suspended = false;
 
     public Int32 Version {
         get {
@@ -71,7 +75,7 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
             Debug.LogError("AfxHookUnity.dll is not injected. It needs to be injected into Unity early.");
         }
 
-        if (!AfxHookUnityInit(0))
+        if (!AfxHookUnityInit(1))
             Debug.LogError("AfxHookUnityInit failed (version mismatch or init failed).");
 
         Application.runInBackground = true; // don't sleep when not having focus
@@ -122,47 +126,28 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
     void advancedfx.Interop.IImplementation.ConnectionLost() {
 
         ReleaseSurfaces();
-
-        deltaTime = 0;
     }
 
     void advancedfx.Interop.IImplementation.Render (advancedfx.Interop.IRenderInfo renderInfo) {
 
-        if (null != renderInfo.FrameInfo && 0 != renderInfo.FrameInfo.AbsoluteFrameTime)
+        if (null != renderInfo.FrameInfo)
         {
-            double time = deltaTime + renderInfo.FrameInfo.AbsoluteFrameTime;
+            float absoluteFrameTime = renderInfo.FrameInfo.AbsoluteFrameTime;
+            float frameTime = renderInfo.FrameInfo.FrameTime;
 
-            double absTime = Math.Max(0.0, time);
+            //Debug.Log(absoluteFrameTime + " / " + frameTime);
 
-            int frameRate = 0.0 != absTime ? (int)Math.Floor(1.0 / absTime) : 0 ;
-
-            if(0 < frameRate)
-            {
-                Time.timeScale = 1;
-                Time.captureFramerate = frameRate;
-            }
-            else
-            {
-                // Can't go back in time, so pause.
-                Time.timeScale = 0;
-                Time.captureFramerate = 0;
-            }
-
-            deltaTime = time - (absTime - (0 != frameRate ?  1.0 / frameRate : 0));
-
-            if(1 < Math.Abs(deltaTime))
-            {
-                Debug.LogError("Clock is one second off, resetting.");
-                deltaTime = 0;
-            }
+            Time.timeScale = 0 == Time.unscaledDeltaTime ? 1 : frameTime / Time.unscaledDeltaTime;
         }
         else
         {
             Debug.Log("No time info available.");
 
             Time.timeScale = 1;
-            Time.captureFramerate = 0;
         }
+
+        if (this.suspended)
+            return;
 
         Camera cam = GetComponent<Camera> ();
 
@@ -197,13 +182,15 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
         {
             case advancedfx.Interop.RenderType.Normal:
                 {
-                    float unityToQuakeScale = 1 / 2.54f * 100;
-                    Matrix4x4 unityToQuakeScaleV = Matrix4x4.Scale(new Vector3(unityToQuakeScale, unityToQuakeScale, unityToQuakeScale));
-
-                    Matrix4x4 unityProjection = cam.projectionMatrix;
-
                     if (null != renderInfo.FrameInfo)
                     {
+                        const float unityToQuakeScaleFac = 100f / 2.54f;
+                        Matrix4x4 unityToQuakeScale = Matrix4x4.Scale(new Vector3(unityToQuakeScaleFac, unityToQuakeScaleFac, unityToQuakeScaleFac));
+
+
+                        int width = renderInfo.FrameInfo.Width;
+                        int height = renderInfo.FrameInfo.Height;
+
                         advancedfx.Interop.Afx4x4 afxWorldToView = renderInfo.FrameInfo.WorldToViewMatrix;
                         Matrix4x4 d3d9QuakeWorldToView = new Matrix4x4();
                         d3d9QuakeWorldToView[0, 0] = afxWorldToView.M00;
@@ -211,8 +198,8 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
                         d3d9QuakeWorldToView[0, 2] = afxWorldToView.M02;
                         d3d9QuakeWorldToView[0, 3] = afxWorldToView.M03;
                         d3d9QuakeWorldToView[1, 0] = afxWorldToView.M10;
-                        d3d9QuakeWorldToView[1, 1] = afxWorldToView.M12;
-                        d3d9QuakeWorldToView[1, 2] = afxWorldToView.M13;
+                        d3d9QuakeWorldToView[1, 1] = afxWorldToView.M11;
+                        d3d9QuakeWorldToView[1, 2] = afxWorldToView.M12;
                         d3d9QuakeWorldToView[1, 3] = afxWorldToView.M13;
                         d3d9QuakeWorldToView[2, 0] = afxWorldToView.M20;
                         d3d9QuakeWorldToView[2, 1] = afxWorldToView.M21;
@@ -248,83 +235,93 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
                         unityToQuake[2, 0] = 0; unityToQuake[2, 1] = 1; unityToQuake[2, 2] = 0; unityToQuake[2, 3] = 0;
                         unityToQuake[3, 0] = 0; unityToQuake[3, 1] = 0; unityToQuake[3, 2] = 0; unityToQuake[3, 3] = 1;
 
-                        Matrix4x4 unityToWorldView = d3d9QuakeWorldToView * (unityToQuake * unityToQuakeScaleV);
+                        Matrix4x4 flipViewZ = new Matrix4x4();
+                        flipViewZ[0, 0] = 1; flipViewZ[0, 1] = 0; flipViewZ[0, 2] = 0; flipViewZ[0, 3] = 0;
+                        flipViewZ[1, 0] = 0; flipViewZ[1, 1] = 1; flipViewZ[1, 2] = 0; flipViewZ[1, 3] = 0;
+                        flipViewZ[2, 0] = 0; flipViewZ[2, 1] = 0; flipViewZ[2, 2] = -1; flipViewZ[2, 3] = 0;
+                        flipViewZ[3, 0] = 0; flipViewZ[3, 1] = 0; flipViewZ[3, 2] = 0; flipViewZ[3, 3] = 1;
 
-                        Matrix4x4 unityToWorldViewInverse = unityToWorldView.inverse;
+                        Matrix4x4 unityToWorldViewInverse = (flipViewZ * (d3d9QuakeWorldToView * (unityToQuake * unityToQuakeScale))).inverse;
 
-                        Vector4 lastCol = unityToWorldViewInverse.GetColumn(3);
-                        cam.transform.position = new Vector3(lastCol.x, lastCol.y, lastCol.z);
-                        cam.transform.rotation = unityToWorldViewInverse.rotation;
-                        cam.transform.localScale = new Vector3(1, 1, 1);
+                        const double Rad2Deg = 180.0 / Math.PI;
 
-                        int width = renderInfo.FrameInfo.Width;
-                        int height = renderInfo.FrameInfo.Height;
+                        Vector4 quakePosition = unityToWorldViewInverse.GetColumn(3);
+                        cam.transform.position = new Vector3(quakePosition.x, quakePosition.y, quakePosition.z);
 
-                        cam.worldToCameraMatrix = unityToWorldView;
+                        Quaternion rotation = unityToWorldViewInverse.rotation;
+                        cam.transform.rotation = new Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
 
-                        unityProjection = ((d3d9QuakeWorldToScreen * (unityToQuake * unityToQuakeScaleV)) * unityToWorldView.inverse);
+                        Vector3 quakeScale = unityToWorldViewInverse.lossyScale;
+                        cam.transform.localScale = new Vector3(quakeScale.x, quakeScale.y, quakeScale.z );
+
+                        //cam.worldToCameraMatrix = unityToWorldView;
+
+                        Matrix4x4 unityProjection = (d3d9QuakeWorldToScreen * (unityToQuake * unityToQuakeScale)) * unityToWorldViewInverse;
 
                         float C = unityProjection[2, 2]; // - (f+n) /(f-n)
                         float D = unityProjection[2, 3]; // - 2*f*n / (f-n)
 
-                        //Debug.Log(D / (C - 1)+" / "+D / (C + 1));
+                        //Debug.Log((D / (C - 1)) + " / " + (D / (C + 1)));
 
-                        cam.nearClipPlane = D / (C - 1);
-                        cam.farClipPlane = D / (C + 1);
-
-                        cam.nearClipPlane = cam.nearClipPlane / cam.farClipPlane;
-                        cam.farClipPlane = 1;
+                        cam.nearClipPlane = -(D / (C + 1)) / unityToQuakeScaleFac;
+                        cam.farClipPlane = -(D / (C - 1)) / unityToQuakeScaleFac;
 
                         cam.pixelRect = new Rect(0, 0, width, height);
                         cam.rect = new Rect(0, 0, width, height);
 
-                        Matrix4x4 d3dToScreen = new Matrix4x4();
-                        d3dToScreen[0, 0] = 1; d3dToScreen[0, 1] = 0; d3dToScreen[0, 2] = 0; d3dToScreen[0, 3] = 0;
-                        d3dToScreen[1, 0] = 0; d3dToScreen[1, 1] = -1 * height / (float)width; d3dToScreen[1, 2] = 0; d3dToScreen[1, 3] = -1 + height / (float)width; // (1-x) * 1/a -1
-                        d3dToScreen[2, 0] = 0; d3dToScreen[2, 1] = 0; d3dToScreen[2, 2] = 1; d3dToScreen[2, 3] = 0;
-                        d3dToScreen[3, 0] = 0; d3dToScreen[3, 1] = 0; d3dToScreen[3, 2] = 0; d3dToScreen[3, 3] = 1;
-
-                        Matrix4x4 correction = new Matrix4x4();
-                        correction[0, 0] = 1; correction[0, 1] = 0; correction[0, 2] = 0; correction[0, 3] = 0;
-                        correction[1, 0] = 0; correction[1, 1] = 1; correction[1, 2] = 0; correction[1, 3] = 0;
-                        correction[2, 0] = 0; correction[2, 1] = 0; correction[2, 2] = 1; correction[2, 3] = 0;
-                        correction[3, 0] = 0; correction[3, 1] = 0; correction[3, 2] = 0; correction[3, 3] = 1;
-
-                        cam.projectionMatrix = correction * (d3dToScreen * unityProjection);
-
-                        const double Rad2Deg = 180.0 / Math.PI;
                         float horizontalFovRad = (float)Math.Atan(1.0 / unityProjection[0, 0]) * 2.0f;
                         float verticalFovDeg = (float)(2 * Math.Atan(Math.Tan(horizontalFovRad / 2.0) * height / (float)width) * Rad2Deg);
 
-                        //Debug.Log(verticalFovDeg);
-
                         cam.fieldOfView = verticalFovDeg;
+
+                        CommandBuffer afxWait = new CommandBuffer();
+                        afxWait.name = "AfxHookUnity: wait for GPU sin(z)nchronization.";
+                        afxWait.IssuePluginEvent(AfxHookUnityGetRenderEventFunc(), 1);
+
+                        CommandBuffer afxTargets = new CommandBuffer();
+                        afxTargets.name = "AfxHookUnity: Enable CreateRenderTargetView hooks.";
+                        afxTargets.IssuePluginEventAndData(AfxHookUnityGetRenderEventAndDataFunc(), 2, renderInfo.FbSurfaceHandle.Value); // Shared color buffer used
+                        // ( not supported yet ) // afxTargets.IssuePluginEventAndData(AfxHookUnityGetRenderEventAndDataFunc(), 3, renderInfo.FbDepthSurfaceHandle.Value); // Shared depth buffer used
+
+                        Graphics.ExecuteCommandBuffer(afxTargets);
+
+                        cam.AddCommandBuffer(CameraEvent.AfterEverything, afxWait);
+
+                        GL.invertCulling = true;
+
+                        Matrix4x4 flipZ = new Matrix4x4();
+                        flipZ[0, 0] = 1; flipZ[0, 1] = 0; flipZ[0, 2] = 0; flipZ[0, 3] = 0;
+                        flipZ[1, 0] = 0; flipZ[1, 1] = 1; flipZ[1, 2] = 0; flipZ[1, 3] = 0;
+                        flipZ[2, 0] = 0; flipZ[2, 1] = 0; flipZ[2, 2] = -1; flipZ[2, 3] = 1;
+                        flipZ[3, 0] = 0; flipZ[3, 1] = 0; flipZ[3, 2] = 0; flipZ[3, 3] = 1;
+
+                        Matrix4x4 d3dToScreen = new Matrix4x4();
+                        d3dToScreen[0, 0] = 1; d3dToScreen[0, 1] = 0; d3dToScreen[0, 2] = 0; d3dToScreen[0, 3] = 0;
+                        d3dToScreen[1, 0] = 0; d3dToScreen[1, 1] = -1 * height / (float)width; d3dToScreen[1, 2] = 0; d3dToScreen[1, 3] = -1 + height / (float)width;
+                        d3dToScreen[2, 0] = 0; d3dToScreen[2, 1] = 0; d3dToScreen[2, 2] = 1; d3dToScreen[2, 3] = 0;
+                        d3dToScreen[3, 0] = 0; d3dToScreen[3, 1] = 0; d3dToScreen[3, 2] = 0; d3dToScreen[3, 3] = 1;
+
+                        Matrix4x4 orgCamProjection = cam.projectionMatrix;
+                        cam.projectionMatrix = d3dToScreen * orgCamProjection;
+
+                        CameraClearFlags oldCameraClearFlags = cam.clearFlags;
+                        cam.clearFlags = CameraClearFlags.Depth;
+
+                        cam.targetTexture = renderTexture;
+                        cam.Render();
+
+                        AfxHookUnityWaitOne();
+
+                        cam.RemoveCommandBuffer(CameraEvent.AfterEverything, afxWait);
+
+                        cam.targetTexture = null;
+
+                        cam.clearFlags = oldCameraClearFlags;
+
+                        cam.projectionMatrix = orgCamProjection;
+
+                        GL.invertCulling = false;
                     }
-
-                    CommandBuffer afxWait = new CommandBuffer();
-                    afxWait.name = "AfxHookUnity: wait for GPU sin(z)nchronization.";
-                    afxWait.IssuePluginEvent(AfxHookUnityGetRenderEventFunc(), 1);
-
-                    CommandBuffer afxTargets = new CommandBuffer();
-                    afxTargets.name = "AfxHookUnity: Enable CreateRenderTargetView hooks.";
-                    afxTargets.IssuePluginEventAndData(AfxHookUnityGetRenderEventAndDataFunc(), 2, renderInfo.FbSurfaceHandle.Value); // Color buffer
-                    // afxTargets.IssuePluginEventAndData(AfxHookUnityGetRenderEventAndDataFunc(), 3, renderInfo.FbDepthSurfaceHandle.Value); // Depth buffer ( not supported yet )
-
-                    Graphics.ExecuteCommandBuffer(afxTargets);
-
-                    cam.AddCommandBuffer(CameraEvent.AfterEverything, afxWait);
-
-                    GL.invertCulling = true;
-                    cam.targetTexture = renderTexture;
-                    cam.Render();
-
-                    AfxHookUnityWaitOne();
-
-                    cam.RemoveCommandBuffer(CameraEvent.AfterEverything, afxWait);
-
-                    cam.projectionMatrix = unityProjection;
-                    cam.targetTexture = null;
-                    GL.invertCulling = false;
                 }
                 break;
         }
@@ -351,6 +348,40 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 	void advancedfx.Interop.IImplementation.ReleaseTexture(UInt32 textureId) {
 	}
 
+    IList<String> advancedfx.Interop.IImplementation.EngineThreadCommands(advancedfx.Interop.ICommandArray commands)
+    {
+        IList<String> reply = new List<String>();
+
+        for (int i = 0; i < commands.Count; ++i)
+        {
+
+            advancedfx.Interop.ICommand command = commands[i];
+
+            if (0 < command.Count)
+            {
+                if (2 <= command.Count && 0 == command[1].CompareTo("afx"))
+                {
+                    if (4 == command.Count && 0 == command[2].CompareTo("suspended"))
+                    {
+                        int value;
+
+                        if (int.TryParse(command[3], out value))
+                            this.suspended = 0 != value;
+
+                        continue;
+                    }
+                }
+
+                reply.Add(
+                  "echo " + command[0] + " afx suspended 0|1 - Suspend / resume rendering.\n"
+                );
+            }
+
+        }
+
+        return reply;
+    }
+
     //
     // Private:
 
@@ -374,6 +405,9 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 	private static extern bool AfxHookUnityInit(int version);
 
     [DllImport("AfxHookUnity")]
+    private static extern void AfxHookUnityBeginCreateRenderTexture(IntPtr fbSharedHandle, IntPtr fbDepthSharedHandle);
+
+    [DllImport("AfxHookUnity")]
     private static extern void AfxHookUnityWaitOne();
 
     [DllImport("AfxHookUnity")]
@@ -393,8 +427,6 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 		public readonly IntPtr FbSurfaceHandle;
         public readonly IntPtr FbDepthSurfaceHandle;
 	}
-
-    private double deltaTime = 0.0;
 
     private Dictionary<RenderTextureKey, RenderTexture> renderTextures = new Dictionary<RenderTextureKey, RenderTexture> ();
 	private Dictionary<IntPtr, List<RenderTextureKey>> surfaceHandleToRenderTextureKeys = new Dictionary<IntPtr, List<RenderTextureKey>>();
