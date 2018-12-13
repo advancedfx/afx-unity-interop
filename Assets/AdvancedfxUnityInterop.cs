@@ -272,6 +272,8 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
                         float horizontalFovRad = (float)Math.Atan(1.0 / unityProjection[0, 0]) * 2.0f;
                         float verticalFovDeg = (float)(2 * Math.Atan(Math.Tan(horizontalFovRad / 2.0) * height / (float)width) * Rad2Deg);
 
+                        //Debug.Log(horizontalFovRad * Rad2Deg + " / " + verticalFovDeg);
+
                         cam.fieldOfView = verticalFovDeg;
 
                         CommandBuffer afxWait = new CommandBuffer();
@@ -318,7 +320,7 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 
                         cam.clearFlags = oldCameraClearFlags;
 
-                        cam.projectionMatrix = orgCamProjection;
+                        cam.ResetProjectionMatrix();
 
                         GL.invertCulling = false;
                     }
