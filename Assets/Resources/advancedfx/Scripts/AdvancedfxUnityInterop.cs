@@ -69,13 +69,12 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 
     public void Awake() {
 
-
         if (IntPtr.Zero == GetModuleHandle("AfxHookUnity.dll"))
         {
             Debug.LogError("AfxHookUnity.dll is not injected. It needs to be injected into Unity early.");
         }
 
-        if (!AfxHookUnityInit(1))
+        if (!AfxHookUnityInit(2))
             Debug.LogError("AfxHookUnityInit failed (version mismatch or init failed).");
 
         Application.runInBackground = true; // don't sleep when not having focus
@@ -92,7 +91,13 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
             cam.allowMSAA = false;
             cam.allowDynamicResolution = false;
         }
+
+        this.testTexture = Resources.Load("advancedfx/Textures/logo2009") as Texture;
+        Debug.Log(this.testTexture);
+        this.drawDepthMaterial = Resources.Load("advancedfx/Materials/DrawDepth") as Material;
     }
+
+    private Texture testTexture;
 
     public void OnEnable() {
 
@@ -157,26 +162,32 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
             return;
         }
 
-        if (!renderInfo.FbSurfaceHandle.HasValue)
+        if (!renderInfo.SurfaceId.HasValue)
         {
-            Debug.LogError("Back buffer unknown.");
+            Debug.LogError("Back buffer not set.");
             return;
         }
-        //if(!renderInfo.FbDepthSurfaceHandle.HasValue)
-        //{
-        //    Debug.LogError("Depth stencil unknown.");
-        //    return;
-        //}
 
-        RenderTexture renderTexture = GetRenderTexture(renderInfo.FbSurfaceHandle.Value, renderInfo.FbDepthSurfaceHandle.HasValue ? renderInfo.FbDepthSurfaceHandle.Value : IntPtr.Zero);
+        SurfaceData surfaceData = null;
+        
+        if(!surfaceIdToSurfaceData.TryGetValue(renderInfo.SurfaceId.Value, out surfaceData))
+        {
+            Debug.LogError("Back buffer "+ renderInfo.SurfaceId.Value + " has not been registerred as surface.");
+        }
+
+        RenderTexture renderTexture = surfaceData.colorTexture;
+        RenderTexture depthTexture = surfaceData.depthTexture;
 
         if (null == renderTexture)
         {
-            Debug.LogError("GetRenderTexture failed.");
+            Debug.LogError("No color surface.");
             return;
         }
 
-        //Debug.Log("FbSurfaceHandle=" + renderInfo.FbSurfaceHandle.Value + ", FbDepthTextureHandle=" + renderInfo.FbDepthSurfaceHandle.Value);
+        if(null == depthTexture)
+        {
+            Debug.LogWarning("No depth color texture surface.");
+        }
 
         switch (renderInfo.Type)
         {
@@ -186,7 +197,6 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
                     {
                         const float unityToQuakeScaleFac = 100f / 2.54f;
                         Matrix4x4 unityToQuakeScale = Matrix4x4.Scale(new Vector3(unityToQuakeScaleFac, unityToQuakeScaleFac, unityToQuakeScaleFac));
-
 
                         int width = renderInfo.FrameInfo.Width;
                         int height = renderInfo.FrameInfo.Height;
@@ -256,20 +266,20 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 
                         //cam.worldToCameraMatrix = unityToWorldView;
 
-                        Matrix4x4 unityProjection = (d3d9QuakeWorldToScreen * (unityToQuake * unityToQuakeScale)) * unityToWorldViewInverse;
+                        Matrix4x4 d3d9QuakeProjection = d3d9QuakeWorldToScreen * d3d9QuakeWorldToView.inverse;
 
-                        float C = unityProjection[2, 2]; // - (f+n) /(f-n)
-                        float D = unityProjection[2, 3]; // - 2*f*n / (f-n)
+                        float C = d3d9QuakeProjection[2, 2]; // - far_plane/(far_plane - near_plane)
+                        float D = d3d9QuakeProjection[2, 3]; // C * near_plane
 
-                        //Debug.Log((D / (C - 1)) + " / " + (D / (C + 1)));
+                        //Debug.Log((D / C) + " / "+ (D / (C + 1)));
 
-                        cam.nearClipPlane = -(D / (C + 1)) / unityToQuakeScaleFac;
-                        cam.farClipPlane = -(D / (C - 1)) / unityToQuakeScaleFac;
+                        cam.nearClipPlane = (D / C) / unityToQuakeScaleFac;
+                        cam.farClipPlane = (D / (C + 1)) / unityToQuakeScaleFac;
 
                         cam.pixelRect = new Rect(0, 0, width, height);
                         cam.rect = new Rect(0, 0, width, height);
 
-                        float horizontalFovRad = (float)Math.Atan(1.0 / unityProjection[0, 0]) * 2.0f;
+                        float horizontalFovRad = (float)Math.Atan(1.0 / d3d9QuakeProjection[0, 0]) * 2.0f;
                         float verticalFovDeg = (float)(2 * Math.Atan(Math.Tan(horizontalFovRad / 2.0) * height / (float)width) * Rad2Deg);
 
                         //Debug.Log(horizontalFovRad * Rad2Deg + " / " + verticalFovDeg);
@@ -277,43 +287,63 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
                         cam.fieldOfView = verticalFovDeg;
 
                         CommandBuffer afxWait = new CommandBuffer();
-                        afxWait.name = "AfxHookUnity: wait for GPU sin(z)nchronization.";
+                        afxWait.name = "AfxHookUnity: wait for GPU sinynchronization.";
                         afxWait.IssuePluginEvent(AfxHookUnityGetRenderEventFunc(), 1);
-
-                        CommandBuffer afxTargets = new CommandBuffer();
-                        afxTargets.name = "AfxHookUnity: Enable CreateRenderTargetView hooks.";
-                        afxTargets.IssuePluginEventAndData(AfxHookUnityGetRenderEventAndDataFunc(), 2, renderInfo.FbSurfaceHandle.Value); // Shared color buffer used
-                        // ( not supported yet ) // afxTargets.IssuePluginEventAndData(AfxHookUnityGetRenderEventAndDataFunc(), 3, renderInfo.FbDepthSurfaceHandle.Value); // Shared depth buffer used
-
-                        Graphics.ExecuteCommandBuffer(afxTargets);
 
                         cam.AddCommandBuffer(CameraEvent.AfterEverything, afxWait);
 
                         GL.invertCulling = true;
 
-                        Matrix4x4 flipZ = new Matrix4x4();
-                        flipZ[0, 0] = 1; flipZ[0, 1] = 0; flipZ[0, 2] = 0; flipZ[0, 3] = 0;
-                        flipZ[1, 0] = 0; flipZ[1, 1] = 1; flipZ[1, 2] = 0; flipZ[1, 3] = 0;
-                        flipZ[2, 0] = 0; flipZ[2, 1] = 0; flipZ[2, 2] = -1; flipZ[2, 3] = 1;
-                        flipZ[3, 0] = 0; flipZ[3, 1] = 0; flipZ[3, 2] = 0; flipZ[3, 3] = 1;
-
-                        Matrix4x4 d3dToScreen = new Matrix4x4();
-                        d3dToScreen[0, 0] = 1; d3dToScreen[0, 1] = 0; d3dToScreen[0, 2] = 0; d3dToScreen[0, 3] = 0;
-                        d3dToScreen[1, 0] = 0; d3dToScreen[1, 1] = -1 * height / (float)width; d3dToScreen[1, 2] = 0; d3dToScreen[1, 3] = -1 + height / (float)width;
-                        d3dToScreen[2, 0] = 0; d3dToScreen[2, 1] = 0; d3dToScreen[2, 2] = 1; d3dToScreen[2, 3] = 0;
-                        d3dToScreen[3, 0] = 0; d3dToScreen[3, 1] = 0; d3dToScreen[3, 2] = 0; d3dToScreen[3, 3] = 1;
-
-                        Matrix4x4 orgCamProjection = cam.projectionMatrix;
-                        cam.projectionMatrix = d3dToScreen * orgCamProjection;
+                        Matrix4x4 orgCamProjection = cam;
+                        cam.projectionMatrix = GL.GetGPUProjectionMatrix(flipViewZ * orgCamProjection, true);
 
                         CameraClearFlags oldCameraClearFlags = cam.clearFlags;
                         cam.clearFlags = CameraClearFlags.Depth;
 
+                        CommandBuffer afxDrawDepth = new CommandBuffer();
+                        afxDrawDepth.name = "AfxHookUnity: Draw depth buffer color texture.";
+
+                        float orthoZ = cam.nearClipPlane + (cam.nearClipPlane + cam.farClipPlane) / 2.0f;
+
+                        var verticies = new Vector3[4] {
+                            new Vector3(0, 0, orthoZ),
+                            new Vector3(1, 0, orthoZ),
+                            new Vector3(0, 1, orthoZ),
+                            new Vector3(1, 1, orthoZ)
+                        };
+
+                        var uvs = new Vector2[4] {
+                            new Vector2(0, 0),
+                            new Vector2(1, 0),
+                            new Vector2(0, 1),
+                            new Vector2(1, 1),
+                        };
+
+                        var triangles = new int[6] {
+                            0, 1, 2,
+                            2, 1, 3,
+                        };
+
+                        var m = new Mesh();
+                        m.vertices = verticies;
+                        m.uv = uvs;
+                        m.triangles = triangles;
+
+                        this.drawDepthMaterial.mainTexture = depthTexture;
+
+                        afxDrawDepth.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
+                        afxDrawDepth.DrawMesh(m, GL.GetGPUProjectionMatrix(flipViewZ * Matrix4x4.Ortho(0,1,1,0,cam.nearClipPlane, cam.farClipPlane), true), this.drawDepthMaterial);
+
+                        cam.AddCommandBuffer(CameraEvent.AfterDepthTexture, afxDrawDepth);
+
                         cam.targetTexture = renderTexture;
                         cam.Render();
 
+                        this.drawDepthMaterial.mainTexture = null;
+
                         AfxHookUnityWaitOne();
 
+                        cam.RemoveCommandBuffer(CameraEvent.AfterDepthTexture, afxDrawDepth);
                         cam.RemoveCommandBuffer(CameraEvent.AfterEverything, afxWait);
 
                         cam.targetTexture = null;
@@ -329,26 +359,24 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
         }
     }
 
-    void advancedfx.Interop.IImplementation.RegisterSurface(advancedfx.Interop.ISurfaceInfo info)
+    void advancedfx.Interop.IImplementation.RegisterSurface(advancedfx.Interop.ISurfaceInfo surfaceInfo, out IntPtr sharedColorTextureHandle, out IntPtr sharedDepthTextureHandle)
     {
-        Debug.Log("Registering Surface: " + info.SharedHandle);
+        Debug.Log("Registering Surface: " + surfaceInfo.Id);
 
-        surfaceHandleToSurfaceInfo[info.SharedHandle] = info;
+        SurfaceData surfaceData = new SurfaceData(surfaceInfo);
+
+        surfaceIdToSurfaceData[surfaceInfo.Id] = surfaceData;
+
+        sharedColorTextureHandle = surfaceData.sharedColorTextureHandle;
+        sharedDepthTextureHandle = surfaceData.sharedDepthTextureHandle;
     }
 
-    void advancedfx.Interop.IImplementation.ReleaseSurface(IntPtr sharedHandle)
+    void advancedfx.Interop.IImplementation.ReleaseSurface(IntPtr surfaceId)
     {
-        Debug.Log("REleasing Surface: " + sharedHandle);
+        Debug.Log("Releasing Surface: " + surfaceId);
 
-        this.ReleaseSurface(sharedHandle);
+        this.ReleaseSurface(surfaceId);
     }
-
-
-    void advancedfx.Interop.IImplementation.RegisterTexture (advancedfx.Interop.ITextureInfo info) {
-	}
-
-	void advancedfx.Interop.IImplementation.ReleaseTexture(UInt32 textureId) {
-	}
 
     IList<String> advancedfx.Interop.IImplementation.EngineThreadCommands(advancedfx.Interop.ICommandArray commands)
     {
@@ -387,6 +415,8 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
     //
     // Private:
 
+    private Material drawDepthMaterial;
+
     private advancedfx.Interop interOp;
 
     [StructLayout(LayoutKind.Sequential)] // Be aware of 32 bit vs 64 bit here, LayoutKind.Explicit is tricky.
@@ -407,7 +437,10 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 	private static extern bool AfxHookUnityInit(int version);
 
     [DllImport("AfxHookUnity")]
-    private static extern void AfxHookUnityBeginCreateRenderTexture(IntPtr fbSharedHandle, IntPtr fbDepthSharedHandle);
+    private static extern IntPtr AfxHookUnityGetSharedHandle(IntPtr d3d11ResourcePtr);
+
+    [DllImport("AfxHookUnity")]
+    private static extern void AfxHookUnityBeginCreateRenderTexture();
 
     [DllImport("AfxHookUnity")]
     private static extern void AfxHookUnityWaitOne();
@@ -418,176 +451,118 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
     [DllImport("AfxHookUnity")]
     private static extern IntPtr AfxHookUnityGetRenderEventAndDataFunc();
 
-    private struct RenderTextureKey
-	{
-        public RenderTextureKey(IntPtr fbSurfaceHandle, IntPtr fbDepthSurfaceHandle)
-        {
-            this.FbSurfaceHandle = fbSurfaceHandle;
-            this.FbDepthSurfaceHandle = fbDepthSurfaceHandle;
-        }
-
-		public readonly IntPtr FbSurfaceHandle;
-        public readonly IntPtr FbDepthSurfaceHandle;
-	}
-
-    private Dictionary<RenderTextureKey, RenderTexture> renderTextures = new Dictionary<RenderTextureKey, RenderTexture> ();
-	private Dictionary<IntPtr, List<RenderTextureKey>> surfaceHandleToRenderTextureKeys = new Dictionary<IntPtr, List<RenderTextureKey>>();
-	private Dictionary<IntPtr, advancedfx.Interop.ISurfaceInfo> surfaceHandleToSurfaceInfo = new Dictionary<IntPtr, advancedfx.Interop.ISurfaceInfo> ();
-
-	private RenderTexture GetRenderTexture(IntPtr fbSurfaceHandle, IntPtr fbDepthSufaceHandle)
-	{
-		RenderTextureKey key = new RenderTextureKey (fbSurfaceHandle, fbDepthSufaceHandle);
-		RenderTexture renderTexture = null;
-
-		if (renderTextures.TryGetValue (key, out renderTexture))
-			return renderTexture;
-
-        advancedfx.Interop.ISurfaceInfo fbSurfaceInfo;
-        advancedfx.Interop.ISurfaceInfo fbDepthSurfaceInfo = null;
-
-        if (!(surfaceHandleToSurfaceInfo.TryGetValue(fbSurfaceHandle, out fbSurfaceInfo)))
-        //if (!(surfaceHandleToSurfaceInfo.TryGetValue (fbSurfaceHandle, out fbSurfaceInfo) && surfaceHandleToSurfaceInfo.TryGetValue (fbDepthSufaceHandle, out fbDepthSurfaceInfo)))
-			return null;
-
-		Nullable<RenderTextureDescriptor> rdesc = GetRenderTextureDescriptor (fbSurfaceInfo, fbDepthSurfaceInfo);
-
-		if (!rdesc.HasValue)
-			return null;
-
-		renderTexture = new RenderTexture (rdesc.Value);
-
-        renderTextures[key] = renderTexture;
-
-		List<RenderTextureKey> list = null;
-		if (!surfaceHandleToRenderTextureKeys.TryGetValue (fbSurfaceHandle, out list)) {
-			list = new List<RenderTextureKey>();
-            surfaceHandleToRenderTextureKeys[fbSurfaceHandle] = list;
-		}
-		list.Add (key);
-
-		//list = null;
-		//if (!surfaceHandleToRenderTextureKeys.TryGetValue (fbDepthSufaceHandle, out list)) {
-		//	list = new List<RenderTextureKey>();
-        //    surfaceHandleToRenderTextureKeys[fbDepthSufaceHandle] = list;
-		//}
-		//list.Add (key);
-
-		return renderTexture;
-	}
-
-	private Nullable<RenderTextureDescriptor> GetRenderTextureDescriptor(advancedfx.Interop.ISurfaceInfo fbSurfaceInfo, advancedfx.Interop.ISurfaceInfo fbDepthSurfaceInfo)
+    private class SurfaceData : IDisposable
     {
-        /*
-        if (
-            fbSurfaceInfo.Width != fbDepthSurfaceInfo.Width
-            || fbSurfaceInfo.Height != fbDepthSurfaceInfo.Height
-        )
+        public SurfaceData(advancedfx.Interop.ISurfaceInfo surfaceInfo)
         {
-            Debug.LogError("Back buffer and depth stencil dimensions don't match");
-            return null;
-        }
-        */
+            this.surfaceInfo = surfaceInfo;
 
-        RenderTextureDescriptor desc = new RenderTextureDescriptor((int)fbSurfaceInfo.Width, (int)fbSurfaceInfo.Height);
+            RenderTexture colorTexture = null;
+            IntPtr sharedColorTextureHandle = IntPtr.Zero;
+            RenderTexture depthTexture = null;
+            IntPtr sharedDepthTextureHandle = IntPtr.Zero;
 
-        Debug.Log("GetRenderTextureDescriptor back buffer: " + fbSurfaceInfo.Format+" ("+ fbSurfaceInfo.Width+","+ fbSurfaceInfo.Height + ")");
-
-        switch (fbSurfaceInfo.Format)
-        {
-            case advancedfx.Interop.D3DFORMAT.D3DFMT_A8R8G8B8:
-                desc.colorFormat = RenderTextureFormat.ARGB32;
-                break;
-            case advancedfx.Interop.D3DFORMAT.D3DFMT_R5G6B5:
-                desc.colorFormat = RenderTextureFormat.RGB565;
-                break;
-            case advancedfx.Interop.D3DFORMAT.D3DFMT_A1R5G5B5:
-                desc.colorFormat = RenderTextureFormat.ARGB1555;
-                break;
-            case advancedfx.Interop.D3DFORMAT.D3DFMT_A4R4G4B4:
-                desc.colorFormat = RenderTextureFormat.ARGB4444;
-                break;
-            case advancedfx.Interop.D3DFORMAT.D3DFMT_A2R10G10B10:
-                desc.colorFormat = RenderTextureFormat.ARGB2101010;
-                break;
-            default:
-                Debug.LogError("Unknown back buffer format: "+ fbSurfaceInfo.Format);
-                return null;
-        }
-
-        /*
-        Debug.Log("GetRenderTextureDescriptor depth stencil: "+ fbDepthSurfaceInfo.Format + " (" + fbDepthSurfaceInfo.Width + "," + fbDepthSurfaceInfo.Height + ")");
-
-        switch (fbDepthSurfaceInfo.Format) // these might be wrong:
-        {
-            case advancedfx.Interop.D3DFORMAT.D3DFMT_D16_LOCKABLE:
-                desc.depthBufferBits = 16;
-                break;
-            case advancedfx.Interop.D3DFORMAT.D3DFMT_D24S8:
-                desc.depthBufferBits = 32;
-                break;
-            case advancedfx.Interop.D3DFORMAT.D3DFMT_D16:
-                desc.depthBufferBits = 16;
-                break;
-            case advancedfx.Interop.D3DFORMAT.D3DFMT_D32F_LOCKABLE:
-                desc.depthBufferBits = 32;
-                break;
-            case advancedfx.Interop.D3DFORMAT.D3DFMT_D24FS8:
-                desc.depthBufferBits = 32;
-                break;
-            case advancedfx.Interop.D3DFORMAT.D3DFMT_D32_LOCKABLE:
-                desc.depthBufferBits = 32;
-                break;
-            case advancedfx.Interop.D3DFORMAT.D3DFMT_INTZ:
-                desc.depthBufferBits = 32;
-                break;
-            default:
-                Debug.LogError("Unknown depth stencil format: " + fbDepthSurfaceInfo.Format);
-                return null;
-        }
-        */
-        desc.depthBufferBits = 32;
-
-        desc.autoGenerateMips = false;
-        desc.bindMS = false;
-        desc.enableRandomWrite = false;
-        desc.sRGB = false; // for windowed CS:GO at least (?).
-        desc.msaaSamples = 1;
-        desc.useMipMap = false;
-
-        return new Nullable<RenderTextureDescriptor>(desc);
-	}
-
-    private void ReleaseSurface(IntPtr surfaceHandle)
-    {
-        List<RenderTextureKey> renderTextureKeys = null;
-
-        if (surfaceHandleToRenderTextureKeys.TryGetValue(surfaceHandle, out renderTextureKeys))
-        {
-
-            foreach (RenderTextureKey renderTextureKey in renderTextureKeys)
+            Nullable<RenderTextureDescriptor> rdesc;
+            
+            rdesc = GetRenderTextureDescriptor(surfaceInfo, false);
+            if (rdesc.HasValue)
             {
-                RenderTexture renderTexture = null;
-
-                if (renderTextures.TryGetValue(renderTextureKey, out renderTexture))
-                {
-
-                    renderTexture.Release();
-
-                    renderTextures.Remove(renderTextureKey);
-                }
+                AfxHookUnityBeginCreateRenderTexture();
+                colorTexture = new RenderTexture(rdesc.Value);
+                colorTexture.Create();
+                sharedColorTextureHandle = AfxHookUnityGetSharedHandle(colorTexture.GetNativeTexturePtr());
+                Debug.Log("Color: " + colorTexture.GetNativeTexturePtr() + " -> " + sharedColorTextureHandle);
             }
 
-            surfaceHandleToRenderTextureKeys.Remove(surfaceHandle);
+            rdesc = GetRenderTextureDescriptor(surfaceInfo, true);
+            if (rdesc.HasValue)
+            {
+                AfxHookUnityBeginCreateRenderTexture();
+                depthTexture = new RenderTexture(rdesc.Value);
+                depthTexture.Create();
+                sharedDepthTextureHandle = AfxHookUnityGetSharedHandle(depthTexture.GetNativeTexturePtr());
+                Debug.Log("Depth: " + depthTexture.GetNativeTexturePtr() + " -> " + sharedDepthTextureHandle);
+            }
+
+            this.colorTexture = colorTexture;
+            this.sharedColorTextureHandle = sharedColorTextureHandle;
+            this.depthTexture = depthTexture;
+            this.sharedDepthTextureHandle = sharedDepthTextureHandle;
         }
 
-        surfaceHandleToSurfaceInfo.Remove(surfaceHandle);
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        bool disposed = false;
+
+        protected virtual void Dispose(bool disposing)
+        {
+
+            if (disposed || !disposing) return;
+
+            if (colorTexture) colorTexture.Release();
+            if (depthTexture) depthTexture.Release();
+
+            disposed = true;
+        }
+
+        public readonly advancedfx.Interop.ISurfaceInfo surfaceInfo;
+        public readonly RenderTexture colorTexture;
+        public readonly IntPtr sharedColorTextureHandle;
+        public readonly RenderTexture depthTexture;
+        public readonly IntPtr sharedDepthTextureHandle;
+
+        private Nullable<RenderTextureDescriptor> GetRenderTextureDescriptor(advancedfx.Interop.ISurfaceInfo fbSurfaceInfo, bool isDepth)
+        {
+            RenderTextureDescriptor desc = new RenderTextureDescriptor((int)fbSurfaceInfo.Width, (int)fbSurfaceInfo.Height);
+
+            Debug.Log("GetRenderTextureDescriptor: " + fbSurfaceInfo.Id + "(" + (isDepth ? "depth" : "color") +")" + ": " + fbSurfaceInfo.Format + " (" + fbSurfaceInfo.Width + "," + fbSurfaceInfo.Height + ")");
+
+            switch (fbSurfaceInfo.Format)
+            {
+                case advancedfx.Interop.D3DFORMAT.D3DFMT_A8R8G8B8:
+                    desc.colorFormat = RenderTextureFormat.BGRA32;
+                    break;
+                default:
+                    Debug.LogError("Unknown back buffer format: " + fbSurfaceInfo.Format);
+                    return null;
+            }
+
+            desc.depthBufferBits = isDepth ? 0 : 32;
+
+            desc.autoGenerateMips = false;
+            desc.bindMS = false;
+            desc.enableRandomWrite = false;
+            desc.sRGB = false; // for windowed CS:GO at least (?).
+            desc.msaaSamples = 1;
+            desc.useMipMap = false;
+
+            return new Nullable<RenderTextureDescriptor>(desc);
+        }
+    }
+
+	private Dictionary<IntPtr, SurfaceData> surfaceIdToSurfaceData = new Dictionary<IntPtr, SurfaceData> ();
+
+    private void ReleaseSurface(IntPtr surfaceId)
+    {
+        SurfaceData surfaceData = null;
+
+        if (surfaceIdToSurfaceData.TryGetValue(surfaceId, out surfaceData))
+        {
+            surfaceData.Dispose();
+        }
+
+        surfaceIdToSurfaceData.Remove(surfaceId);
     }
 
     private void ReleaseSurfaces()
     {
        while(true)
        {
-            IEnumerator<IntPtr> keyEnumerator = surfaceHandleToSurfaceInfo.Keys.GetEnumerator();
+            IEnumerator<IntPtr> keyEnumerator = surfaceIdToSurfaceData.Keys.GetEnumerator();
             if (!keyEnumerator.MoveNext())
                 return;
 

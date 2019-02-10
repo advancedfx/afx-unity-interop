@@ -1,7 +1,7 @@
 # Test version
 
-- Tested with Unity 2018.2.18f1.
-- Needs HLAE 2.57.0 (2018-12-03T16:24Z) or newer.
+- Tested with Unity 2018.3.5f1.
+- Needs HLAE 2.61.0 (2019-02-xxTxx:xxZ) or newer.
 
 Usage:
 
