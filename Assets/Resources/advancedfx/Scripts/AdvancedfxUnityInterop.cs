@@ -92,8 +92,8 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
             cam.allowDynamicResolution = false;
         }
 
-        this.testTexture = Resources.Load("advancedfx/Textures/logo2009") as Texture;
-        Debug.Log(this.testTexture);
+        //this.testTexture = Resources.Load("advancedfx/Textures/logo2009") as Texture;
+        //Debug.Log(this.testTexture);
         this.drawDepthMaterial = Resources.Load("advancedfx/Materials/DrawDepth") as Material;
     }
 
@@ -193,51 +193,52 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
         {
             case advancedfx.Interop.RenderType.Normal:
                 {
+                    int width = renderInfo.Width;
+                    int height = renderInfo.Height;
+
+                    advancedfx.Interop.Afx4x4 afxWorldToView = renderInfo.ViewMatrix;
+                    Matrix4x4 d3d9QuakeWorldToView = new Matrix4x4();
+                    d3d9QuakeWorldToView[0, 0] = afxWorldToView.M00;
+                    d3d9QuakeWorldToView[0, 1] = afxWorldToView.M01;
+                    d3d9QuakeWorldToView[0, 2] = afxWorldToView.M02;
+                    d3d9QuakeWorldToView[0, 3] = afxWorldToView.M03;
+                    d3d9QuakeWorldToView[1, 0] = afxWorldToView.M10;
+                    d3d9QuakeWorldToView[1, 1] = afxWorldToView.M11;
+                    d3d9QuakeWorldToView[1, 2] = afxWorldToView.M12;
+                    d3d9QuakeWorldToView[1, 3] = afxWorldToView.M13;
+                    d3d9QuakeWorldToView[2, 0] = afxWorldToView.M20;
+                    d3d9QuakeWorldToView[2, 1] = afxWorldToView.M21;
+                    d3d9QuakeWorldToView[2, 2] = afxWorldToView.M22;
+                    d3d9QuakeWorldToView[2, 3] = afxWorldToView.M23;
+                    d3d9QuakeWorldToView[3, 0] = afxWorldToView.M30;
+                    d3d9QuakeWorldToView[3, 1] = afxWorldToView.M31;
+                    d3d9QuakeWorldToView[3, 2] = afxWorldToView.M32;
+                    d3d9QuakeWorldToView[3, 3] = afxWorldToView.M33;
+
+                    advancedfx.Interop.Afx4x4 afxProjectionMatrix = renderInfo.ProjectionMatrix;
+                    Matrix4x4 d3d9QuakeProjection = new Matrix4x4();
+                    d3d9QuakeProjection[0, 0] = afxProjectionMatrix.M00;
+                    d3d9QuakeProjection[0, 1] = afxProjectionMatrix.M01;
+                    d3d9QuakeProjection[0, 2] = afxProjectionMatrix.M02;
+                    d3d9QuakeProjection[0, 3] = afxProjectionMatrix.M03;
+                    d3d9QuakeProjection[1, 0] = afxProjectionMatrix.M10;
+                    d3d9QuakeProjection[1, 1] = afxProjectionMatrix.M11;
+                    d3d9QuakeProjection[1, 2] = afxProjectionMatrix.M12;
+                    d3d9QuakeProjection[1, 3] = afxProjectionMatrix.M13;
+                    d3d9QuakeProjection[2, 0] = afxProjectionMatrix.M20;
+                    d3d9QuakeProjection[2, 1] = afxProjectionMatrix.M21;
+                    d3d9QuakeProjection[2, 2] = afxProjectionMatrix.M22;
+                    d3d9QuakeProjection[2, 3] = afxProjectionMatrix.M23;
+                    d3d9QuakeProjection[3, 0] = afxProjectionMatrix.M30;
+                    d3d9QuakeProjection[3, 1] = afxProjectionMatrix.M31;
+                    d3d9QuakeProjection[3, 2] = afxProjectionMatrix.M32;
+                    
+                    //Debug.Log(d3d9QuakeProjection);
+
                     if (null != renderInfo.FrameInfo)
                     {
                         const float unityToQuakeScaleFac = 100f / 2.54f;
                         Matrix4x4 unityToQuakeScale = Matrix4x4.Scale(new Vector3(unityToQuakeScaleFac, unityToQuakeScaleFac, unityToQuakeScaleFac));
-
-                        int width = renderInfo.FrameInfo.Width;
-                        int height = renderInfo.FrameInfo.Height;
-
-                        advancedfx.Interop.Afx4x4 afxWorldToView = renderInfo.FrameInfo.WorldToViewMatrix;
-                        Matrix4x4 d3d9QuakeWorldToView = new Matrix4x4();
-                        d3d9QuakeWorldToView[0, 0] = afxWorldToView.M00;
-                        d3d9QuakeWorldToView[0, 1] = afxWorldToView.M01;
-                        d3d9QuakeWorldToView[0, 2] = afxWorldToView.M02;
-                        d3d9QuakeWorldToView[0, 3] = afxWorldToView.M03;
-                        d3d9QuakeWorldToView[1, 0] = afxWorldToView.M10;
-                        d3d9QuakeWorldToView[1, 1] = afxWorldToView.M11;
-                        d3d9QuakeWorldToView[1, 2] = afxWorldToView.M12;
-                        d3d9QuakeWorldToView[1, 3] = afxWorldToView.M13;
-                        d3d9QuakeWorldToView[2, 0] = afxWorldToView.M20;
-                        d3d9QuakeWorldToView[2, 1] = afxWorldToView.M21;
-                        d3d9QuakeWorldToView[2, 2] = afxWorldToView.M22;
-                        d3d9QuakeWorldToView[2, 3] = afxWorldToView.M23;
-                        d3d9QuakeWorldToView[3, 0] = afxWorldToView.M30;
-                        d3d9QuakeWorldToView[3, 1] = afxWorldToView.M31;
-                        d3d9QuakeWorldToView[3, 2] = afxWorldToView.M32;
-                        d3d9QuakeWorldToView[3, 3] = afxWorldToView.M33;
-
-                        advancedfx.Interop.Afx4x4 afxWorldToScreen = renderInfo.FrameInfo.WorldToScreenMatrix;
-                        Matrix4x4 d3d9QuakeWorldToScreen = new Matrix4x4();
-                        d3d9QuakeWorldToScreen[0, 0] = afxWorldToScreen.M00;
-                        d3d9QuakeWorldToScreen[0, 1] = afxWorldToScreen.M01;
-                        d3d9QuakeWorldToScreen[0, 2] = afxWorldToScreen.M02;
-                        d3d9QuakeWorldToScreen[0, 3] = afxWorldToScreen.M03;
-                        d3d9QuakeWorldToScreen[1, 0] = afxWorldToScreen.M10;
-                        d3d9QuakeWorldToScreen[1, 1] = afxWorldToScreen.M11;
-                        d3d9QuakeWorldToScreen[1, 2] = afxWorldToScreen.M12;
-                        d3d9QuakeWorldToScreen[1, 3] = afxWorldToScreen.M13;
-                        d3d9QuakeWorldToScreen[2, 0] = afxWorldToScreen.M20;
-                        d3d9QuakeWorldToScreen[2, 1] = afxWorldToScreen.M21;
-                        d3d9QuakeWorldToScreen[2, 2] = afxWorldToScreen.M22;
-                        d3d9QuakeWorldToScreen[2, 3] = afxWorldToScreen.M23;
-                        d3d9QuakeWorldToScreen[3, 0] = afxWorldToScreen.M30;
-                        d3d9QuakeWorldToScreen[3, 1] = afxWorldToScreen.M31;
-                        d3d9QuakeWorldToScreen[3, 2] = afxWorldToScreen.M32;
-                        d3d9QuakeWorldToScreen[3, 3] = afxWorldToScreen.M33;
 
                         Matrix4x4 unityToQuake = new Matrix4x4();
                         unityToQuake[0, 0] = 0; unityToQuake[0, 1] = 0; unityToQuake[0, 2] = 1; unityToQuake[0, 3] = 0;
@@ -266,12 +267,10 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 
                         //cam.worldToCameraMatrix = unityToWorldView;
 
-                        Matrix4x4 d3d9QuakeProjection = d3d9QuakeWorldToScreen * d3d9QuakeWorldToView.inverse;
-
                         float C = d3d9QuakeProjection[2, 2]; // - far_plane/(far_plane - near_plane)
                         float D = d3d9QuakeProjection[2, 3]; // C * near_plane
 
-                        //Debug.Log((D / C) + " / "+ (D / (C + 1)));
+                        //Debug.Log((D / C) + " / " + (D / (C + 1)));
 
                         cam.nearClipPlane = (D / C) / unityToQuakeScaleFac;
                         cam.farClipPlane = (D / (C + 1)) / unityToQuakeScaleFac;
@@ -294,7 +293,7 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 
                         GL.invertCulling = true;
 
-                        Matrix4x4 orgCamProjection = cam;
+                        Matrix4x4 orgCamProjection = cam.projectionMatrix;
                         cam.projectionMatrix = GL.GetGPUProjectionMatrix(flipViewZ * orgCamProjection, true);
 
                         CameraClearFlags oldCameraClearFlags = cam.clearFlags;
@@ -331,10 +330,13 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 
                         this.drawDepthMaterial.mainTexture = depthTexture;
 
+                        Vector4 zParams = new Vector4((D / C), (D / (C + 1)), 0);
+                        this.drawDepthMaterial.SetVector("_ZParams", zParams);
+
                         afxDrawDepth.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
                         afxDrawDepth.DrawMesh(m, GL.GetGPUProjectionMatrix(flipViewZ * Matrix4x4.Ortho(0,1,1,0,cam.nearClipPlane, cam.farClipPlane), true), this.drawDepthMaterial);
 
-                        cam.AddCommandBuffer(CameraEvent.AfterDepthTexture, afxDrawDepth);
+                        cam.AddCommandBuffer(CameraEvent.BeforeForwardOpaque, afxDrawDepth);
 
                         cam.targetTexture = renderTexture;
                         cam.Render();
@@ -343,7 +345,7 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
 
                         AfxHookUnityWaitOne();
 
-                        cam.RemoveCommandBuffer(CameraEvent.AfterDepthTexture, afxDrawDepth);
+                        cam.RemoveCommandBuffer(CameraEvent.BeforeForwardOpaque, afxDrawDepth);
                         cam.RemoveCommandBuffer(CameraEvent.AfterEverything, afxWait);
 
                         cam.targetTexture = null;

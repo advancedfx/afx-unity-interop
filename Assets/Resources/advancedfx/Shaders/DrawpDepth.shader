@@ -3,6 +3,7 @@
 	Properties
 	{
 		_MainTex ("Texture", 2D) = "white" {}
+		_ZParams ("ZParams (near,far,0,0)", Vector) = (0,1,0,0) 
 	}
 	SubShader
 	{
@@ -35,6 +36,7 @@
 
 			sampler2D _MainTex;
 			float4 _MainTex_ST;
+			float4 _ZParams;
 			
 			v2f vert (appdata v)
 			{
@@ -48,19 +50,20 @@
 			{
 				float4 col = tex2D(_MainTex, i.uv);
 			
-				// https://docs.unity3d.com/Manual/UpgradeGuide55.html
-				// x = -1+far/near
-				// y = 1
-				// z = x/far = -1/far + 1/near
-				// w = 1/far
+				// _ZBufferParams:
+				// x = 1-f/n
+				// y = f/n
+				// z = x/far
+				// w = y/far
 				
-				float g_Afx_zNear = 1.0/((_ZBufferParams.x + 1)*_ZBufferParams.w) * 100.0 / 2.54;
-				float g_Afx_zFar = (1.0/_ZBufferParams.w) * 100 / 2.54;
+				float g_Afx_zNear = _ZParams.x;
+				float g_Afx_zFar = _ZParams.y;
 				
 				float f1 = (-1) * g_Afx_zFar * g_Afx_zNear * 1.0;
 				float xD = g_Afx_zFar - g_Afx_zNear;
 				
-				float depth = (255 * 1.0/16777215.0)*col.r +(255 * 256.0/16777215.0)*col.g +(255 * 65536.0/16777215.0)*col.b;
+				const float4 kDecodeDot = float4(1.0, 1/255.0, 1/65025.0, 1/16581375.0);
+				float depth = dot( col, kDecodeDot );
 				
 				// decode to linear in inch:
 				depth = f1/(depth * xD -g_Afx_zFar);
