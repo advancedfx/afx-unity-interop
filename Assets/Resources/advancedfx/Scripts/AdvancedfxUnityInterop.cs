@@ -284,6 +284,7 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
                         //Debug.Log(horizontalFovRad * Rad2Deg + " / " + verticalFovDeg);
 
                         cam.fieldOfView = verticalFovDeg;
+                        cam.aspect = (0 != height) ? (width / (float)height) : 1.0f;
 
                         CommandBuffer afxWait = new CommandBuffer();
                         afxWait.name = "AfxHookUnity: wait for GPU sinynchronization.";
@@ -353,6 +354,7 @@ public class AdvancedfxUnityInterop : MonoBehaviour, advancedfx.Interop.IImpleme
                         cam.clearFlags = oldCameraClearFlags;
 
                         cam.ResetProjectionMatrix();
+                        cam.ResetAspect();
 
                         GL.invertCulling = false;
                     }
