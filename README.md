@@ -1,11 +1,11 @@
 # Test version
 
-- Tested with Unity 2018.3.5f1.
+- Tested with Unity 2018.3.8f1.
 - Needs HLAE 2.62.0 (2019-02-12T17:00Z) or newer.
 
 # Important
 
-Make sure your Unity console does not have the "Error Pause" button pushed in, otherwise of the game and Unity will freeze upon exceptions in your other Unity code.
+Make sure your Unity console does not have the "Error Pause" button pushed in, otherwise the game and Unity will freeze upon exceptions in your other Unity code.
 
 Please understand that this is a test version and things will change heavily!
 
@@ -23,5 +23,5 @@ Please understand that this is a test version and things will change heavily!
 
 # Known problems:
 
-- FPS drops at spawn
+- FPS drops at round start
 - Transparent materials will be overdrawn (e.g. smoke particles or worst: if fully in smoke (can be dampened a bit by putting a baseFx stream into preview and setting smokeOverlayAlphaFactor less than 1 on that and forceBuildingCubeMaps 0).
