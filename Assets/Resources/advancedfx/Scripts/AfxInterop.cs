@@ -82,11 +82,14 @@ public class AfxInterop : MonoBehaviour
         afxDrawEnd.name = "AfxHookUnity: AfxDrawEndCallBack.";
         afxDrawEnd.SetInvertCulling(false);
         afxDrawEnd.IssuePluginEvent(AfxHookUnityGetRenderEventFunc(), 3);
+
+        m_AfxInteropCommandsDelegate += AfxInteropCommands;
+        m_AfxInteropRenderDelegate += AfxInteropRender;
     }
 
     public void OnEnable() {
 
-        AfxInteropCreate(pipeName, AfxInteropCommands, AfxInteropRender);
+        AfxInteropCreate(pipeName, m_AfxInteropCommandsDelegate, m_AfxInteropRenderDelegate);
     }
 
     public void OnDisable() {
@@ -354,6 +357,10 @@ public class AfxInterop : MonoBehaviour
     private CameraClearFlags afxOldCameraClearFlags;
 
     SurfaceData m_ReplacementSurface;
+
+    AfxInteropCommandsDelegate m_AfxInteropCommandsDelegate;
+    AfxInteropRenderDelegate m_AfxInteropRenderDelegate;
+
 
     [StructLayout(LayoutKind.Sequential)]
     public struct AfxInteropMatrix4x4
