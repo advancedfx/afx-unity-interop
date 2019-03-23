@@ -425,8 +425,7 @@ public class AfxInterop : MonoBehaviour
     private static extern UInt32 AfxInteropCommands_GetCommandArgCount(IntPtr commands, UInt32 index);
 
     [DllImport("AfxHookUnity")]
-    [return: MarshalAs(UnmanagedType.LPStr)]
-    private static extern string AfxInteropCommands_GetCommandArg(IntPtr commands, UInt32 index, UInt32 argIndex);
+    private static extern IntPtr AfxInteropCommands_GetCommandArg(IntPtr commands, UInt32 index, UInt32 argIndex);
 
     [DllImport("AfxHookUnity")]
     private static extern void AfxInteropDestroy();
@@ -546,18 +545,18 @@ public class AfxInterop : MonoBehaviour
 
                 if (0 < argCount)
                 {
-                    string arg0 = AfxInteropCommands_GetCommandArg(commands, i, 0);
+                    string arg0 = DoAfxInteropCommands_GetCommandArg(commands, i, 0);
 
                     if (2 <= argCount)
                     {
-                        string arg1 = AfxInteropCommands_GetCommandArg(commands, i, 1);
+                        string arg1 = DoAfxInteropCommands_GetCommandArg(commands, i, 1);
 
                         if (0 == arg1.CompareTo("afx"))
                         {
-                            if (4 == commandCount)
+                            if (4 == argCount)
                             {
-                                string arg2 = AfxInteropCommands_GetCommandArg(commands, i, 2);
-                                string arg3 = AfxInteropCommands_GetCommandArg(commands, i, 3);
+                                string arg2 = DoAfxInteropCommands_GetCommandArg(commands, i, 2);
+                                string arg3 = DoAfxInteropCommands_GetCommandArg(commands, i, 3);
 
                                 if (0 == arg2.CompareTo("suspended"))
                                 {
@@ -570,6 +569,7 @@ public class AfxInterop : MonoBehaviour
                                 }
                             }
                         }
+
                     }
 
                     AfxInteropScheduleCommand("echo " + arg0 + " afx suspended 0|1 - Suspend / resume rendering.\n");
@@ -637,7 +637,13 @@ public class AfxInterop : MonoBehaviour
             outColorDepthTextureWasLost = wasLost;
             outSharedColorDepthTextureHandle = m_ReplacementSurface.sharedDepthTextureHandle;
 
-            if (this.suspended) return;
+            if (this.suspended)
+            {
+                GL.IssuePluginEvent(AfxHookUnityGetRenderEventFunc(), 2);
+                GL.IssuePluginEvent(AfxHookUnityGetRenderEventFunc(), 3);
+
+                return;
+            }
 
             if (null == afxCamera) return;
 
@@ -788,5 +794,10 @@ public class AfxInterop : MonoBehaviour
             outColorDepthTextureWasLost = true;
             outSharedColorDepthTextureHandle = IntPtr.Zero;
         }
+    }
+
+    string DoAfxInteropCommands_GetCommandArg(IntPtr commands, UInt32 index, UInt32 argIndex)
+    {
+        return Marshal.PtrToStringAnsi(AfxInteropCommands_GetCommandArg(commands, index, argIndex));
     }
 }
