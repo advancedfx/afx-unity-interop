@@ -398,7 +398,7 @@ public class AfxInterop : MonoBehaviour
 
     delegate void AfxInteropCommandsDelegate(IntPtr commands);
 
-    delegate void AfxInteropRenderDelegate(ref AfxInteropRenderInfo renderInfo, out bool outColorTextureWasLost, out IntPtr outSharedColorTextureHandle, out bool outColorDepthTextureWasLost, out IntPtr outSharedColorepthTextureHandle);
+    delegate void AfxInteropRenderDelegate(ref AfxInteropRenderInfo renderInfo, out bool outColorTextureWasLost, out IntPtr outSharedColorTextureHandle, out bool outColorDepthTextureWasLost, out IntPtr outSharedColorDepthTextureHandle);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
     public static extern IntPtr GetModuleHandle(string lpModuleName);
@@ -535,237 +535,258 @@ public class AfxInterop : MonoBehaviour
 
     void AfxInteropCommands(IntPtr commands)
     {
-        UInt32 commandCount = AfxInteropCommands_GetCommandCount(commands);
-
-        for (UInt32 i = 0; i < commandCount; ++i)
+        // Exceptions must not make it into native code (this is called from native code):
+        try
         {
-            UInt32 argCount = AfxInteropCommands_GetCommandArgCount(commands, i);
+            UInt32 commandCount = AfxInteropCommands_GetCommandCount(commands);
 
-            if (0 < argCount)
+            for (UInt32 i = 0; i < commandCount; ++i)
             {
-                string arg0 = AfxInteropCommands_GetCommandArg(commands, i, 0);
+                UInt32 argCount = AfxInteropCommands_GetCommandArgCount(commands, i);
 
-                if (2 <= argCount) 
+                if (0 < argCount)
                 {
-                    string arg1 = AfxInteropCommands_GetCommandArg(commands, i, 1);
+                    string arg0 = AfxInteropCommands_GetCommandArg(commands, i, 0);
 
-                    if (0 == arg1.CompareTo("afx"))
+                    if (2 <= argCount)
                     {
-                        if (4 == commandCount)                          
+                        string arg1 = AfxInteropCommands_GetCommandArg(commands, i, 1);
+
+                        if (0 == arg1.CompareTo("afx"))
                         {
-                            string arg2 = AfxInteropCommands_GetCommandArg(commands, i, 2);
-                            string arg3 = AfxInteropCommands_GetCommandArg(commands, i, 3);
-
-                            if (0 == arg2.CompareTo("suspended"))
+                            if (4 == commandCount)
                             {
-                                int value;
+                                string arg2 = AfxInteropCommands_GetCommandArg(commands, i, 2);
+                                string arg3 = AfxInteropCommands_GetCommandArg(commands, i, 3);
 
-                                if (int.TryParse(arg3, out value))
-                                    this.suspended = 0 != value;
+                                if (0 == arg2.CompareTo("suspended"))
+                                {
+                                    int value;
 
-                                continue;
+                                    if (int.TryParse(arg3, out value))
+                                        this.suspended = 0 != value;
+
+                                    continue;
+                                }
                             }
                         }
                     }
-                }
 
-                AfxInteropScheduleCommand("echo " + arg0 + " afx suspended 0|1 - Suspend / resume rendering.\n");
+                    AfxInteropScheduleCommand("echo " + arg0 + " afx suspended 0|1 - Suspend / resume rendering.\n");
+                }
             }
+        }
+        catch (Exception e)
+        {
+            Debug.LogException(e, this);
         }
     }
 
-    void AfxInteropRender(ref AfxInteropRenderInfo renderInfo, out bool outColorTextureWasLost, out IntPtr outSharedColorTextureHandle, out bool outColorDepthTextureWasLost, out IntPtr outSharedColorepthTextureHandle)
+    void AfxInteropRender(ref AfxInteropRenderInfo renderInfo, out bool outColorTextureWasLost, out IntPtr outSharedColorTextureHandle, out bool outColorDepthTextureWasLost, out IntPtr outSharedColorDepthTextureHandle)
     {
-        float absoluteFrameTime = renderInfo.AbsoluteFrameTime;
-        float frameTime = renderInfo.FrameTime;
-
-        //Debug.Log(absoluteFrameTime + " / " + frameTime);
-
-        Time.timeScale = 0 == Time.unscaledDeltaTime ? 1 : frameTime / Time.unscaledDeltaTime;
-
-        bool wasLost = false;
-
-        if (null != m_ReplacementSurface && (m_ReplacementSurface.colorTexture.width != renderInfo.Width || m_ReplacementSurface.colorTexture.height != renderInfo.Height))
+        // Exceptions must not make it into native code (this is called from native code):
+        try
         {
-            m_ReplacementSurface.Dispose();
-            m_ReplacementSurface = null;
-        }
+            float absoluteFrameTime = renderInfo.AbsoluteFrameTime;
+            float frameTime = renderInfo.FrameTime;
 
-        if (null == m_ReplacementSurface)
-        {
-            wasLost = true;
+            //Debug.Log(absoluteFrameTime + " / " + frameTime);
 
-            SurfaceInfo surfaceInfo = new SurfaceInfo();
-            surfaceInfo.Id = IntPtr.Zero;
-            surfaceInfo.Width = (UInt32)renderInfo.Width;
-            surfaceInfo.Height = (UInt32)renderInfo.Height;
-            surfaceInfo.Usage = D3DUSAGE.D3DUSAGE_RENDERTARGET;
-            surfaceInfo.Format = D3DFORMAT.D3DFMT_A8R8G8B8;
-            surfaceInfo.Pool = D3DPOOL.D3DPOOL_DEFAULT;
-            surfaceInfo.MultiSampleType = D3DMULTISAMPLE_TYPE.D3DMULTISAMPLE_NONE;
-            surfaceInfo.MultiSampleQuality = 0u;
+            Time.timeScale = 0 == Time.unscaledDeltaTime ? 1 : frameTime / Time.unscaledDeltaTime;
 
-            m_ReplacementSurface = new SurfaceData(surfaceInfo);
-        }
+            bool wasLost = false;
 
-        RenderTexture renderTexture = m_ReplacementSurface.colorTexture;
-        RenderTexture depthTexture = m_ReplacementSurface.depthTexture;
+            if (null != m_ReplacementSurface && (m_ReplacementSurface.colorTexture.width != renderInfo.Width || m_ReplacementSurface.colorTexture.height != renderInfo.Height))
+            {
+                m_ReplacementSurface.Dispose();
+                m_ReplacementSurface = null;
+            }
 
-        if (null == renderTexture)
-        {
-            Debug.LogWarning("No color surface.");
-        }
+            if (null == m_ReplacementSurface)
+            {
+                wasLost = true;
 
-        if (null == depthTexture)
-        {
-            Debug.LogWarning("No depth color texture surface.");
-        }
+                SurfaceInfo surfaceInfo = new SurfaceInfo();
+                surfaceInfo.Id = IntPtr.Zero;
+                surfaceInfo.Width = (UInt32)renderInfo.Width;
+                surfaceInfo.Height = (UInt32)renderInfo.Height;
+                surfaceInfo.Usage = D3DUSAGE.D3DUSAGE_RENDERTARGET;
+                surfaceInfo.Format = D3DFORMAT.D3DFMT_A8R8G8B8;
+                surfaceInfo.Pool = D3DPOOL.D3DPOOL_DEFAULT;
+                surfaceInfo.MultiSampleType = D3DMULTISAMPLE_TYPE.D3DMULTISAMPLE_NONE;
+                surfaceInfo.MultiSampleQuality = 0u;
 
-        outColorTextureWasLost = wasLost;
-        outSharedColorTextureHandle = m_ReplacementSurface.sharedColorTextureHandle;
-        outColorDepthTextureWasLost = wasLost;
-        outSharedColorepthTextureHandle = m_ReplacementSurface.sharedDepthTextureHandle;
+                m_ReplacementSurface = new SurfaceData(surfaceInfo);
+            }
 
-        if (this.suspended) return;
+            RenderTexture renderTexture = m_ReplacementSurface.colorTexture;
+            RenderTexture depthTexture = m_ReplacementSurface.depthTexture;
 
-        if (null == afxCamera) return;
+            if (null == renderTexture)
+            {
+                Debug.LogWarning("No color surface.");
+            }
 
-        {
-            int width = renderInfo.Width;
-            int height = renderInfo.Height;
+            if (null == depthTexture)
+            {
+                Debug.LogWarning("No depth color texture surface.");
+            }
 
-            Matrix4x4 d3d9QuakeWorldToView = new Matrix4x4();
-            d3d9QuakeWorldToView[0, 0] = renderInfo.ViewMatrix.M00;
-            d3d9QuakeWorldToView[0, 1] = renderInfo.ViewMatrix.M01;
-            d3d9QuakeWorldToView[0, 2] = renderInfo.ViewMatrix.M02;
-            d3d9QuakeWorldToView[0, 3] = renderInfo.ViewMatrix.M03;
-            d3d9QuakeWorldToView[1, 0] = renderInfo.ViewMatrix.M10;
-            d3d9QuakeWorldToView[1, 1] = renderInfo.ViewMatrix.M11;
-            d3d9QuakeWorldToView[1, 2] = renderInfo.ViewMatrix.M12;
-            d3d9QuakeWorldToView[1, 3] = renderInfo.ViewMatrix.M13;
-            d3d9QuakeWorldToView[2, 0] = renderInfo.ViewMatrix.M20;
-            d3d9QuakeWorldToView[2, 1] = renderInfo.ViewMatrix.M21;
-            d3d9QuakeWorldToView[2, 2] = renderInfo.ViewMatrix.M22;
-            d3d9QuakeWorldToView[2, 3] = renderInfo.ViewMatrix.M23;
-            d3d9QuakeWorldToView[3, 0] = renderInfo.ViewMatrix.M30;
-            d3d9QuakeWorldToView[3, 1] = renderInfo.ViewMatrix.M31;
-            d3d9QuakeWorldToView[3, 2] = renderInfo.ViewMatrix.M32;
-            d3d9QuakeWorldToView[3, 3] = renderInfo.ViewMatrix.M33;
+            outColorTextureWasLost = wasLost;
+            outSharedColorTextureHandle = m_ReplacementSurface.sharedColorTextureHandle;
+            outColorDepthTextureWasLost = wasLost;
+            outSharedColorDepthTextureHandle = m_ReplacementSurface.sharedDepthTextureHandle;
 
-            Matrix4x4 d3d9QuakeProjection = new Matrix4x4();
-            d3d9QuakeProjection[0, 0] = renderInfo.ProjectionMatrix.M00;
-            d3d9QuakeProjection[0, 1] = renderInfo.ProjectionMatrix.M01;
-            d3d9QuakeProjection[0, 2] = renderInfo.ProjectionMatrix.M02;
-            d3d9QuakeProjection[0, 3] = renderInfo.ProjectionMatrix.M03;
-            d3d9QuakeProjection[1, 0] = renderInfo.ProjectionMatrix.M10;
-            d3d9QuakeProjection[1, 1] = renderInfo.ProjectionMatrix.M11;
-            d3d9QuakeProjection[1, 2] = renderInfo.ProjectionMatrix.M12;
-            d3d9QuakeProjection[1, 3] = renderInfo.ProjectionMatrix.M13;
-            d3d9QuakeProjection[2, 0] = renderInfo.ProjectionMatrix.M20;
-            d3d9QuakeProjection[2, 1] = renderInfo.ProjectionMatrix.M21;
-            d3d9QuakeProjection[2, 2] = renderInfo.ProjectionMatrix.M22;
-            d3d9QuakeProjection[2, 3] = renderInfo.ProjectionMatrix.M23;
-            d3d9QuakeProjection[3, 0] = renderInfo.ProjectionMatrix.M30;
-            d3d9QuakeProjection[3, 1] = renderInfo.ProjectionMatrix.M31;
-            d3d9QuakeProjection[3, 2] = renderInfo.ProjectionMatrix.M32;
+            if (this.suspended) return;
 
-            //Debug.Log(d3d9QuakeProjection);
+            if (null == afxCamera) return;
 
-            const float unityToQuakeScaleFac = 100f / 2.54f;
-            Matrix4x4 unityToQuakeScale = Matrix4x4.Scale(new Vector3(unityToQuakeScaleFac, unityToQuakeScaleFac, unityToQuakeScaleFac));
+            {
+                int width = renderInfo.Width;
+                int height = renderInfo.Height;
 
-            Matrix4x4 unityToQuake = new Matrix4x4();
-            unityToQuake[0, 0] = 0; unityToQuake[0, 1] = 0; unityToQuake[0, 2] = 1; unityToQuake[0, 3] = 0;
-            unityToQuake[1, 0] = -1; unityToQuake[1, 1] = 0; unityToQuake[1, 2] = 0; unityToQuake[1, 3] = 0;
-            unityToQuake[2, 0] = 0; unityToQuake[2, 1] = 1; unityToQuake[2, 2] = 0; unityToQuake[2, 3] = 0;
-            unityToQuake[3, 0] = 0; unityToQuake[3, 1] = 0; unityToQuake[3, 2] = 0; unityToQuake[3, 3] = 1;
+                Matrix4x4 d3d9QuakeWorldToView = new Matrix4x4();
+                d3d9QuakeWorldToView[0, 0] = renderInfo.ViewMatrix.M00;
+                d3d9QuakeWorldToView[0, 1] = renderInfo.ViewMatrix.M01;
+                d3d9QuakeWorldToView[0, 2] = renderInfo.ViewMatrix.M02;
+                d3d9QuakeWorldToView[0, 3] = renderInfo.ViewMatrix.M03;
+                d3d9QuakeWorldToView[1, 0] = renderInfo.ViewMatrix.M10;
+                d3d9QuakeWorldToView[1, 1] = renderInfo.ViewMatrix.M11;
+                d3d9QuakeWorldToView[1, 2] = renderInfo.ViewMatrix.M12;
+                d3d9QuakeWorldToView[1, 3] = renderInfo.ViewMatrix.M13;
+                d3d9QuakeWorldToView[2, 0] = renderInfo.ViewMatrix.M20;
+                d3d9QuakeWorldToView[2, 1] = renderInfo.ViewMatrix.M21;
+                d3d9QuakeWorldToView[2, 2] = renderInfo.ViewMatrix.M22;
+                d3d9QuakeWorldToView[2, 3] = renderInfo.ViewMatrix.M23;
+                d3d9QuakeWorldToView[3, 0] = renderInfo.ViewMatrix.M30;
+                d3d9QuakeWorldToView[3, 1] = renderInfo.ViewMatrix.M31;
+                d3d9QuakeWorldToView[3, 2] = renderInfo.ViewMatrix.M32;
+                d3d9QuakeWorldToView[3, 3] = renderInfo.ViewMatrix.M33;
 
-            Matrix4x4 flipViewZ = new Matrix4x4();
-            flipViewZ[0, 0] = 1; flipViewZ[0, 1] = 0; flipViewZ[0, 2] = 0; flipViewZ[0, 3] = 0;
-            flipViewZ[1, 0] = 0; flipViewZ[1, 1] = 1; flipViewZ[1, 2] = 0; flipViewZ[1, 3] = 0;
-            flipViewZ[2, 0] = 0; flipViewZ[2, 1] = 0; flipViewZ[2, 2] = -1; flipViewZ[2, 3] = 0;
-            flipViewZ[3, 0] = 0; flipViewZ[3, 1] = 0; flipViewZ[3, 2] = 0; flipViewZ[3, 3] = 1;
+                Matrix4x4 d3d9QuakeProjection = new Matrix4x4();
+                d3d9QuakeProjection[0, 0] = renderInfo.ProjectionMatrix.M00;
+                d3d9QuakeProjection[0, 1] = renderInfo.ProjectionMatrix.M01;
+                d3d9QuakeProjection[0, 2] = renderInfo.ProjectionMatrix.M02;
+                d3d9QuakeProjection[0, 3] = renderInfo.ProjectionMatrix.M03;
+                d3d9QuakeProjection[1, 0] = renderInfo.ProjectionMatrix.M10;
+                d3d9QuakeProjection[1, 1] = renderInfo.ProjectionMatrix.M11;
+                d3d9QuakeProjection[1, 2] = renderInfo.ProjectionMatrix.M12;
+                d3d9QuakeProjection[1, 3] = renderInfo.ProjectionMatrix.M13;
+                d3d9QuakeProjection[2, 0] = renderInfo.ProjectionMatrix.M20;
+                d3d9QuakeProjection[2, 1] = renderInfo.ProjectionMatrix.M21;
+                d3d9QuakeProjection[2, 2] = renderInfo.ProjectionMatrix.M22;
+                d3d9QuakeProjection[2, 3] = renderInfo.ProjectionMatrix.M23;
+                d3d9QuakeProjection[3, 0] = renderInfo.ProjectionMatrix.M30;
+                d3d9QuakeProjection[3, 1] = renderInfo.ProjectionMatrix.M31;
+                d3d9QuakeProjection[3, 2] = renderInfo.ProjectionMatrix.M32;
 
-            Matrix4x4 unityToWorldViewInverse = (flipViewZ * (d3d9QuakeWorldToView * (unityToQuake * unityToQuakeScale))).inverse;
+                //Debug.Log(d3d9QuakeProjection);
 
-            const double Rad2Deg = 180.0 / Math.PI;
+                const float unityToQuakeScaleFac = 100f / 2.54f;
+                Matrix4x4 unityToQuakeScale = Matrix4x4.Scale(new Vector3(unityToQuakeScaleFac, unityToQuakeScaleFac, unityToQuakeScaleFac));
 
-            Vector4 quakePosition = unityToWorldViewInverse.GetColumn(3);
-            afxCamera.transform.position = new Vector3(quakePosition.x, quakePosition.y, quakePosition.z);
+                Matrix4x4 unityToQuake = new Matrix4x4();
+                unityToQuake[0, 0] = 0; unityToQuake[0, 1] = 0; unityToQuake[0, 2] = 1; unityToQuake[0, 3] = 0;
+                unityToQuake[1, 0] = -1; unityToQuake[1, 1] = 0; unityToQuake[1, 2] = 0; unityToQuake[1, 3] = 0;
+                unityToQuake[2, 0] = 0; unityToQuake[2, 1] = 1; unityToQuake[2, 2] = 0; unityToQuake[2, 3] = 0;
+                unityToQuake[3, 0] = 0; unityToQuake[3, 1] = 0; unityToQuake[3, 2] = 0; unityToQuake[3, 3] = 1;
 
-            Quaternion rotation = unityToWorldViewInverse.rotation;
-            afxCamera.transform.rotation = new Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
+                Matrix4x4 flipViewZ = new Matrix4x4();
+                flipViewZ[0, 0] = 1; flipViewZ[0, 1] = 0; flipViewZ[0, 2] = 0; flipViewZ[0, 3] = 0;
+                flipViewZ[1, 0] = 0; flipViewZ[1, 1] = 1; flipViewZ[1, 2] = 0; flipViewZ[1, 3] = 0;
+                flipViewZ[2, 0] = 0; flipViewZ[2, 1] = 0; flipViewZ[2, 2] = -1; flipViewZ[2, 3] = 0;
+                flipViewZ[3, 0] = 0; flipViewZ[3, 1] = 0; flipViewZ[3, 2] = 0; flipViewZ[3, 3] = 1;
 
-            Vector3 quakeScale = unityToWorldViewInverse.lossyScale;
-            afxCamera.transform.localScale = new Vector3(quakeScale.x, quakeScale.y, quakeScale.z);
+                Matrix4x4 unityToWorldViewInverse = (flipViewZ * (d3d9QuakeWorldToView * (unityToQuake * unityToQuakeScale))).inverse;
 
-            //afxCamera.worldToCameraMatrix = unityToWorldView;
+                const double Rad2Deg = 180.0 / Math.PI;
 
-            float C = d3d9QuakeProjection[2, 2]; // - far_plane/(far_plane - near_plane)
-            float D = d3d9QuakeProjection[2, 3]; // C * near_plane
+                Vector4 quakePosition = unityToWorldViewInverse.GetColumn(3);
+                afxCamera.transform.position = new Vector3(quakePosition.x, quakePosition.y, quakePosition.z);
 
-            //Debug.Log((D / C) + " / " + (D / (C + 1)));
+                Quaternion rotation = unityToWorldViewInverse.rotation;
+                afxCamera.transform.rotation = new Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
 
-            afxCamera.nearClipPlane = (D / C) / unityToQuakeScaleFac;
-            afxCamera.farClipPlane = (D / (C + 1)) / unityToQuakeScaleFac;
+                Vector3 quakeScale = unityToWorldViewInverse.lossyScale;
+                afxCamera.transform.localScale = new Vector3(quakeScale.x, quakeScale.y, quakeScale.z);
 
-            afxCamera.pixelRect = new Rect(0, 0, width, height);
-            afxCamera.rect = new Rect(0, 0, width, height);
+                //afxCamera.worldToCameraMatrix = unityToWorldView;
 
-            float horizontalFovRad = (float)Math.Atan(1.0 / d3d9QuakeProjection[0, 0]) * 2.0f;
-            float verticalFovDeg = (float)(2 * Math.Atan(Math.Tan(horizontalFovRad / 2.0) * height / (float)width) * Rad2Deg);
+                float C = d3d9QuakeProjection[2, 2]; // - far_plane/(far_plane - near_plane)
+                float D = d3d9QuakeProjection[2, 3]; // C * near_plane
 
-            //Debug.Log(horizontalFovRad * Rad2Deg + " / " + verticalFovDeg);
+                //Debug.Log((D / C) + " / " + (D / (C + 1)));
 
-            afxCamera.fieldOfView = verticalFovDeg;
-            afxCamera.aspect = (0 != height) ? (width / (float)height) : 1.0f;
+                afxCamera.nearClipPlane = (D / C) / unityToQuakeScaleFac;
+                afxCamera.farClipPlane = (D / (C + 1)) / unityToQuakeScaleFac;
 
-            Matrix4x4 orgCamProjection = afxCamera.projectionMatrix;
-            afxCamera.projectionMatrix = GL.GetGPUProjectionMatrix(flipViewZ * orgCamProjection, true);
+                afxCamera.pixelRect = new Rect(0, 0, width, height);
+                afxCamera.rect = new Rect(0, 0, width, height);
 
-            afxOldCameraClearFlags = afxCamera.clearFlags;
-            afxCamera.clearFlags = CameraClearFlags.Depth;
+                float horizontalFovRad = (float)Math.Atan(1.0 / d3d9QuakeProjection[0, 0]) * 2.0f;
+                float verticalFovDeg = (float)(2 * Math.Atan(Math.Tan(horizontalFovRad / 2.0) * height / (float)width) * Rad2Deg);
 
-            afxDrawDepth = new CommandBuffer();
-            afxDrawDepth.name = "AfxHookUnity: Draw depth buffer color texture.";
+                //Debug.Log(horizontalFovRad * Rad2Deg + " / " + verticalFovDeg);
 
-            float orthoZ = afxCamera.nearClipPlane + (afxCamera.nearClipPlane + afxCamera.farClipPlane) / 2.0f;
+                afxCamera.fieldOfView = verticalFovDeg;
+                afxCamera.aspect = (0 != height) ? (width / (float)height) : 1.0f;
 
-            var verticies = new Vector3[4] {
+                Matrix4x4 orgCamProjection = afxCamera.projectionMatrix;
+                afxCamera.projectionMatrix = GL.GetGPUProjectionMatrix(flipViewZ * orgCamProjection, true);
+
+                afxOldCameraClearFlags = afxCamera.clearFlags;
+                afxCamera.clearFlags = CameraClearFlags.Depth;
+
+                afxDrawDepth = new CommandBuffer();
+                afxDrawDepth.name = "AfxHookUnity: Draw depth buffer color texture.";
+
+                float orthoZ = afxCamera.nearClipPlane + (afxCamera.nearClipPlane + afxCamera.farClipPlane) / 2.0f;
+
+                var verticies = new Vector3[4] {
                 new Vector3(0, 0, orthoZ),
                 new Vector3(1, 0, orthoZ),
                 new Vector3(0, 1, orthoZ),
                 new Vector3(1, 1, orthoZ)
             };
 
-            var uvs = new Vector2[4] {
+                var uvs = new Vector2[4] {
                 new Vector2(0, 0),
                 new Vector2(1, 0),
                 new Vector2(0, 1),
                 new Vector2(1, 1),
             };
 
-            var triangles = new int[6] {
+                var triangles = new int[6] {
                 0, 1, 2,
                 2, 1, 3,
             };
 
-            var m = new Mesh();
-            m.vertices = verticies;
-            m.uv = uvs;
-            m.triangles = triangles;
+                var m = new Mesh();
+                m.vertices = verticies;
+                m.uv = uvs;
+                m.triangles = triangles;
 
-            this.drawDepthMaterial.mainTexture = depthTexture;
+                this.drawDepthMaterial.mainTexture = depthTexture;
 
-            Vector4 zParams = new Vector4((D / C), (D / (C + 1)), 0);
-            this.drawDepthMaterial.SetVector("_ZParams", zParams);
+                Vector4 zParams = new Vector4((D / C), (D / (C + 1)), 0);
+                this.drawDepthMaterial.SetVector("_ZParams", zParams);
 
-            afxDrawDepth.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
-            afxDrawDepth.DrawMesh(m, GL.GetGPUProjectionMatrix(flipViewZ * Matrix4x4.Ortho(0, 1, 1, 0, afxCamera.nearClipPlane, afxCamera.farClipPlane), true), this.drawDepthMaterial);
+                afxDrawDepth.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
+                afxDrawDepth.DrawMesh(m, GL.GetGPUProjectionMatrix(flipViewZ * Matrix4x4.Ortho(0, 1, 1, 0, afxCamera.nearClipPlane, afxCamera.farClipPlane), true), this.drawDepthMaterial);
 
-            afxCamera.targetTexture = renderTexture;
+                afxCamera.targetTexture = renderTexture;
 
-            afxCameraUpdated = true;
+                afxCameraUpdated = true;
+            }
+        }
+        catch(Exception e)
+        {
+            Debug.LogException(e, this);
+
+            outColorTextureWasLost = true;
+            outSharedColorTextureHandle = IntPtr.Zero;
+            outColorDepthTextureWasLost = true;
+            outSharedColorDepthTextureHandle = IntPtr.Zero;
         }
     }
 }
