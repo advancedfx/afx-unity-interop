@@ -52,9 +52,115 @@ public class AfxInterop : MonoBehaviour
 {
     public string pipeName = "advancedfxInterop";
 
-    public volatile bool suspended = false;
+    public bool suspended = false;
 
     public Camera afxOverrideCamera = null;
+
+    public bool afxOverrideCameraEnabled = true;
+
+    //
+
+    public const float quakeToUntiyScaleFac = (12f / 16f) * (2.54f / 100f); // https://developer.valvesoftware.com/wiki/Dimensions
+
+    public const float unityToQuakeScaleFac = (100f / 2.54f) * (16f / 12f);
+
+    public static Vector3 ToUnityVector(AfxInteropVector value)
+    {
+        return new Vector3(-value.Y / unityToQuakeScaleFac, value.Z / unityToQuakeScaleFac, value.X / unityToQuakeScaleFac);
+    }
+
+    public static Quaternion ToUnityQuaternion(AfxInteropQAngle value)
+    {
+        return
+            Quaternion.AngleAxis(-value.Yaw, Vector3.up)
+            * Quaternion.AngleAxis(value.Pitch, Vector3.right)
+            * Quaternion.AngleAxis(-value.Roll, Vector3.forward);     
+    }
+
+    public static AfxInteropVector FromUnityVector(Vector3 value)
+    {
+        AfxInteropVector result = new AfxInteropVector();
+
+        result.X = value.z * unityToQuakeScaleFac;
+        result.Y = -value.x * unityToQuakeScaleFac;
+        result.Z = value.y * unityToQuakeScaleFac;
+
+        return result;
+    }
+
+    public static AfxInteropQAngle FromUnityQuaternion(Quaternion value)
+    {
+        AfxInteropQAngle result = new AfxInteropQAngle();
+
+        float W = value[3];
+        float X = value[2];
+        float Y = -value[0];
+        float Z = value[1];
+
+        float sqw = W * W;
+        float sqx = X * X;
+        float sqy = Y * Y;
+        float sqz = Z * Z;
+
+        float ssq = sqx + sqy + sqz + sqw;
+        float invs = 0f != ssq ? 1f / ssq : 0f;
+        float m00 = (sqx - sqy - sqz + sqw) * invs;
+        //float m11 = (-sqx + sqy - sqz + sqw)*invs;
+        float m22 = (-sqx - sqy + sqz + sqw) * invs;
+
+        float tmp1 = X * Y;
+        float tmp2 = Z * W;
+        float m10 = 2.0f * (tmp1 + tmp2) * invs;
+        //float m01 = 2.0f * (tmp1 - tmp2)*invs;
+
+        tmp1 = X * Z;
+        tmp2 = Y * W;
+        float m20 = 2.0f * (tmp1 - tmp2) * invs;
+        //float m02 = 2.0f * (tmp1 + tmp2)*invs;
+
+        tmp1 = Y * Z;
+        tmp2 = X * W;
+        float m21 = 2.0f * (tmp1 + tmp2) * invs;
+        //float m12 = 2.0f * (tmp1 - tmp2)*invs;
+
+        float sinYPitch = -m20;
+        float yPitch;
+        float zYaw;
+        float xRoll;
+
+        if (sinYPitch > 1.0 - 1.0e-6f)
+        {
+            // sout pole singularity:
+
+            yPitch = Mathf.PI / 2.0f;
+
+            xRoll = -2.0f * Mathf.Atan2(Z * invs, W * invs);
+            zYaw = 0;
+        }
+        else
+        if (sinYPitch < -1.0 + 1.0e-6f)
+        {
+            // north pole singularity:
+
+            yPitch = -Mathf.PI / 2.0f;
+            xRoll = 2.0f * Mathf.Atan2(Z * invs, W * invs);
+            zYaw = 0;
+        }
+        else
+        {
+            // hopefully no singularity:
+
+            yPitch = Mathf.Asin(sinYPitch);
+            zYaw = Mathf.Atan2(m10, m00);
+            xRoll = Mathf.Atan2(m21, m22);
+        }
+
+        result.Pitch = -yPitch * Mathf.Rad2Deg;
+        result.Yaw = -zYaw * Mathf.Rad2Deg;
+        result.Roll = -xRoll * Mathf.Rad2Deg;
+
+        return result;
+    }
 
     //
 
@@ -85,16 +191,21 @@ public class AfxInterop : MonoBehaviour
 
         m_AfxInteropCommandsDelegate += AfxInteropCommands;
         m_AfxInteropRenderDelegate += AfxInteropRender;
+        m_AfxInteropOnRenderViewCallbackDelegate += AfxInteropOnRenderView;
     }
 
     public void OnEnable() {
 
+        AfxInteropSetOnRenderViewCallback(m_AfxInteropOnRenderViewCallbackDelegate);
+
         AfxInteropCreate(pipeName, m_AfxInteropCommandsDelegate, m_AfxInteropRenderDelegate);
     }
 
-    public void OnDisable() {
+    public void OnDisable() {       
 
         AfxInteropDestroy();
+
+        AfxInteropSetOnRenderViewCallback(null);
 
         if (null != m_ReplacementSurface)
         {
@@ -360,7 +471,7 @@ public class AfxInterop : MonoBehaviour
 
     AfxInteropCommandsDelegate m_AfxInteropCommandsDelegate;
     AfxInteropRenderDelegate m_AfxInteropRenderDelegate;
-
+    AfxInteropOnRenderViewCallbackDelegate m_AfxInteropOnRenderViewCallbackDelegate;
 
     [StructLayout(LayoutKind.Sequential)]
     public struct AfxInteropMatrix4x4
@@ -396,12 +507,73 @@ public class AfxInterop : MonoBehaviour
         public Single FrameTime;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    public struct AfxInteropHandleCalcResult
+    {
+        public Int32 IntHandle;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct AfxInteropVector
+    {
+        public Single X;
+        public Single Y;
+        public Single Z;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct AfxInteropQAngle
+    {
+        public Single Pitch;
+        public Single Yaw;
+        public Single Roll;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct AfxInteropVecAngCalcResult
+    {
+        public AfxInteropVector Vector;
+        public AfxInteropQAngle QAngle;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct AfxInteropCamCalcResult
+    {
+        public AfxInteropVector Vector;
+        public AfxInteropQAngle QAngle;
+        public Single Fov;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct AfxInteropFovCalcResult
+    {
+        public Single Fov;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct AfxInteropBoolCalcResult
+    {
+        public Boolean Result;
+    }
+
+    public delegate void AfxInteropHandleCalcCallbackDelegate(ref Nullable<AfxInteropHandleCalcResult> result);
+
+    public delegate void AfxInteropVecAngCalcCallbackDelegate(ref Nullable<AfxInteropVecAngCalcResult> result);
+
+    public delegate void AfxInteropCamCalcCallbackDelegate(ref Nullable<AfxInteropCamCalcResult> result);
+
+    public delegate void AfxInteropFovCalcCallbackDelegate(ref Nullable<AfxInteropFovCalcResult> result);
+
+    public delegate void AfxInteropBoolCalcCallbackDelegate(ref Nullable<AfxInteropBoolCalcResult> result);
+
     delegate void AfxInteropCommandsDelegate(IntPtr commands);
+
+    delegate bool AfxInteropOnRenderViewCallbackDelegate(ref float TX, ref float Ty, ref float Tz, ref float Rx, ref float Ry, ref float Rz, ref float Fov);
 
     delegate void AfxInteropRenderDelegate(ref AfxInteropRenderInfo renderInfo, out bool outColorTextureWasLost, out IntPtr outSharedColorTextureHandle, out bool outColorDepthTextureWasLost, out IntPtr outSharedColorDepthTextureHandle);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
-    public static extern IntPtr GetModuleHandle(string lpModuleName);
+    private static extern IntPtr GetModuleHandle(string lpModuleName);
 
     [DllImport ("AfxHookUnity")]
 	private static extern bool AfxHookUnityInit(int version);
@@ -438,6 +610,32 @@ public class AfxInterop : MonoBehaviour
 
     [DllImport("AfxHookUnity")]
     private static extern bool AfxInteropScheduleCommand([MarshalAs(UnmanagedType.LPStr)] string command);
+
+    [DllImport("AfxHookUnity")]
+    private static extern void AfxInteropSetOnRenderViewCallback(AfxInteropOnRenderViewCallbackDelegate callback);
+
+    /// <returns>Iterator that has to be unregisterred with AfxInteropRemoveCallback, before the delgate is move or removed.</returns>
+    [DllImport("AfxHookUnity")]
+    public static extern IntPtr AfxInteropAddHandleCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, AfxInteropHandleCalcCallbackDelegate callback);
+
+    /// <returns>Iterator that has to be unregisterred with AfxInteropRemoveCallback, before the delgate is move or removed.</returns>
+    [DllImport("AfxHookUnity")]
+    public static extern IntPtr AfxInteropVecAngCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, AfxInteropVecAngCalcCallbackDelegate callback);
+
+    /// <returns>Iterator that has to be unregisterred with AfxInteropRemoveCallback, before the delgate is move or removed.</returns>
+    [DllImport("AfxHookUnity")]
+    public static extern IntPtr AfxInteropAddCamCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, AfxInteropCamCalcCallbackDelegate callback);
+
+    /// <returns>Iterator that has to be unregisterred with AfxInteropRemoveCallback, before the delgate is move or removed.</returns>
+    [DllImport("AfxHookUnity")]
+    public static extern IntPtr AfxInteropAddFovCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, AfxInteropFovCalcCallbackDelegate callback);
+
+    /// <returns>Iterator that has to be unregisterred with AfxInteropRemoveCallback, before the delgate is move or removed.</returns>
+    [DllImport("AfxHookUnity")]
+    public static extern IntPtr AfxInteropAddBoolCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, AfxInteropBoolCalcCallbackDelegate callback);
+
+    [DllImport("AfxHookUnity")]
+    public static extern void AfxInteropRemoveCallback(IntPtr iterator);
 
     private class SurfaceData : IDisposable
     {
@@ -688,7 +886,6 @@ public class AfxInterop : MonoBehaviour
 
                 //Debug.Log(d3d9QuakeProjection);
 
-                const float unityToQuakeScaleFac = 100f / 2.54f;
                 Matrix4x4 unityToQuakeScale = Matrix4x4.Scale(new Vector3(unityToQuakeScaleFac, unityToQuakeScaleFac, unityToQuakeScaleFac));
 
                 Matrix4x4 unityToQuake = new Matrix4x4();
@@ -799,5 +996,31 @@ public class AfxInterop : MonoBehaviour
     string DoAfxInteropCommands_GetCommandArg(IntPtr commands, UInt32 index, UInt32 argIndex)
     {
         return Marshal.PtrToStringAnsi(AfxInteropCommands_GetCommandArg(commands, index, argIndex));
+    }
+
+    bool AfxInteropOnRenderView(ref float Tx, ref float Ty, ref float Tz, ref float Rx, ref float Ry, ref float Rz, ref float Fov)
+    {
+        if(afxOverrideCameraEnabled && null != afxOverrideCamera)
+        {
+            Transform transform = afxOverrideCamera.transform;
+
+            AfxInteropVector vec = FromUnityVector(transform.position);
+
+            AfxInteropQAngle rot = FromUnityQuaternion(transform.rotation);
+
+            Tx = vec.X;
+            Ty = vec.Y;
+            Tz = vec.Z;
+
+            Rx = rot.Pitch;
+            Ry = rot.Yaw;
+            Rz = rot.Roll;
+
+            Fov = afxOverrideCamera.fieldOfView;
+
+            return true;
+        }
+
+        return false;
     }
 }

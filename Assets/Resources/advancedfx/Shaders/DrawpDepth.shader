@@ -69,7 +69,7 @@
 				depth = f1/(depth * xD -g_Afx_zFar);
 				
 				// to meters (Unity):
-				depth = depth * 2.54 / 100.0;
+				depth = depth * (2.54 / 100.0) * (12.0 / 16.0);
 				
 				// to Unity zBuffer (inverse of LinearEyeDepth):
 				depth = (1.0/depth - _ZBufferParams.w) / _ZBufferParams.z;
