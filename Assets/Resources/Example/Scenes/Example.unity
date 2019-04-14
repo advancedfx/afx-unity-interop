@@ -211,6 +211,132 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &587528064
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 100000, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_Name
+      value: observerTargetEye
+      objectReference: {fileID: 0}
+    - target: {fileID: 100002, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_Name
+      value: observerTargetCone
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_RootOrder
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400002, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: -90
+      objectReference: {fileID: 0}
+    - target: {fileID: 400002, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400002, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 400002, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 400002, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400002, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400002, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 400002, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 400002, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 400002, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 2300000, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: 72d683a80a594754db60494dd98a9bb3, type: 2}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 0a97efec3ca64f745bb55640f5917979, type: 3}
+--- !u!1 &587528065 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 100000, guid: 0a97efec3ca64f745bb55640f5917979,
+    type: 3}
+  m_PrefabInstance: {fileID: 587528064}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &587528066
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 587528065}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4c90ceb5d7c965f4e82665c28ff6a3d6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  afxVecAngCalcName: afxObserverEye
+  afxAliveBoolCalcName: afxObserverAlive
+  afxTeamNumberIntCalcName: afxObserverTeamNumber
 --- !u!1 &590730023
 GameObject:
   m_ObjectHideFlags: 0
@@ -222,7 +348,6 @@ GameObject:
   - component: {fileID: 590730024}
   - component: {fileID: 590730027}
   - component: {fileID: 590730026}
-  - component: {fileID: 590730025}
   - component: {fileID: 590730028}
   m_Layer: 0
   m_Name: Quake Y
@@ -245,19 +370,6 @@ Transform:
   m_Father: {fileID: 648909474}
   m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &590730025
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 590730023}
-  m_Material: {fileID: 0}
-  m_IsTrigger: 0
-  m_Enabled: 1
-  serializedVersion: 2
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!23 &590730026
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -328,7 +440,6 @@ GameObject:
   - component: {fileID: 648909474}
   - component: {fileID: 648909473}
   - component: {fileID: 648909472}
-  - component: {fileID: 648909471}
   - component: {fileID: 648909476}
   - component: {fileID: 648909475}
   m_Layer: 0
@@ -338,19 +449,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!65 &648909471
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 648909470}
-  m_Material: {fileID: 0}
-  m_IsTrigger: 0
-  m_Enabled: 1
-  serializedVersion: 2
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!23 &648909472
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -5090,7 +5188,6 @@ GameObject:
   - component: {fileID: 1158339275}
   - component: {fileID: 1158339278}
   - component: {fileID: 1158339277}
-  - component: {fileID: 1158339276}
   - component: {fileID: 1158339279}
   m_Layer: 0
   m_Name: Quake X
@@ -5113,19 +5210,6 @@ Transform:
   m_Father: {fileID: 648909474}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &1158339276
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1158339274}
-  m_Material: {fileID: 0}
-  m_IsTrigger: 0
-  m_Enabled: 1
-  serializedVersion: 2
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!23 &1158339277
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -5235,7 +5319,7 @@ Camera:
     height: 1
   near clip plane: 0.3
   far clip plane: 1000
-  field of view: 60
+  field of view: 73.73979
   orthographic: 0
   orthographic size: 5
   m_Depth: 0
@@ -5278,7 +5362,6 @@ GameObject:
   - component: {fileID: 1971970339}
   - component: {fileID: 1971970342}
   - component: {fileID: 1971970341}
-  - component: {fileID: 1971970340}
   - component: {fileID: 1971970343}
   m_Layer: 0
   m_Name: Quake Z
@@ -5301,19 +5384,6 @@ Transform:
   m_Father: {fileID: 648909474}
   m_RootOrder: 2
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &1971970340
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1971970338}
-  m_Material: {fileID: 0}
-  m_IsTrigger: 0
-  m_Enabled: 1
-  serializedVersion: 2
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!23 &1971970341
 MeshRenderer:
   m_ObjectHideFlags: 0

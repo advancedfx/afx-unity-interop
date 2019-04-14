@@ -46,10 +46,279 @@ w =  100 / 2.54 * unityY
 
 */
 
-// TODO: Might leak texture handles.
+
+// TODO: Might leak texture handles. Not anymore? Dunno.
 
 public class AfxInterop : MonoBehaviour
 {
+    public class BaseCalc : IDisposable
+    {
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected IntPtr iterator;
+        protected GCHandle gcHandle;
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposed || !disposing) return;
+
+            AfxInteropRemoveCallback(iterator);
+
+            gcHandle.Free();
+
+            disposed = true;
+        }
+
+        private bool disposed = false;
+    }
+
+    public class HandleCalc : BaseCalc, IDisposable
+    {
+        public delegate void CallbackDelegate(Nullable<AfxInteropHandleCalcResult> result);
+
+        public HandleCalc(UnityEngine.Object owner, string name, CallbackDelegate callback)
+        {
+            this.owner = owner;
+            this.callback = callback;
+            this.ownCallback = Callback;
+            this.gcHandle = GCHandle.Alloc(this.ownCallback, GCHandleType.Pinned);
+            this.iterator = AfxInteropAddHandleCalcCallback(name, ownCallback);
+        }
+
+        private AfxInteropHandleCalcCallbackDelegate ownCallback;
+        private CallbackDelegate callback;
+        private UnityEngine.Object owner;
+
+        private void Callback(IntPtr result)
+        {
+            // Exceptions must not go into native code:
+            try
+            {
+                callback(IntPtr.Zero == result ? new Nullable<AfxInteropHandleCalcResult>() : new Nullable<AfxInteropHandleCalcResult>(Marshal.PtrToStructure<AfxInteropHandleCalcResult>(result)));
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e, owner);
+            }
+        }
+    }
+
+    public class VecAngCalc : BaseCalc, IDisposable
+    {
+        public delegate void CallbackDelegate(Nullable<AfxInteropVecAngCalcResult> result);
+
+        public VecAngCalc(UnityEngine.Object owner, string name, CallbackDelegate callback)
+        {
+            this.owner = owner;
+            this.callback = callback;
+            this.ownCallback = Callback;
+            this.gcHandle = GCHandle.Alloc(this.ownCallback, GCHandleType.Pinned);
+            this.iterator = AfxInteropAddVecAngCalcCallback(name, ownCallback);
+        }
+
+        private AfxInteropVecAngCalcCallbackDelegate ownCallback;
+        private CallbackDelegate callback;
+        private UnityEngine.Object owner;
+
+        private void Callback(IntPtr result)
+        {
+            // Exceptions must not go into native code:
+            try
+            {
+                callback(IntPtr.Zero == result ? new Nullable<AfxInteropVecAngCalcResult>() : new Nullable<AfxInteropVecAngCalcResult>(Marshal.PtrToStructure<AfxInteropVecAngCalcResult>(result)));
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e, owner);
+            }
+        }
+    }
+
+    public class CamCalc : BaseCalc, IDisposable
+    {
+        public delegate void CallbackDelegate(Nullable<AfxInteropCamCalcResult> result);
+
+        public CamCalc(UnityEngine.Object owner, string name, CallbackDelegate callback)
+        {
+            this.owner = owner;
+            this.callback = callback;
+            this.ownCallback = Callback;
+            this.gcHandle = GCHandle.Alloc(this.ownCallback, GCHandleType.Pinned);
+            this.iterator = AfxInteropAddCamCalcCallback(name, ownCallback);
+        }
+
+        private AfxInteropCamCalcCallbackDelegate ownCallback;
+        private CallbackDelegate callback;
+        private UnityEngine.Object owner;
+
+        private void Callback(IntPtr result)
+        {
+            // Exceptions must not go into native code:
+            try
+            {
+                callback(IntPtr.Zero == result ? new Nullable<AfxInteropCamCalcResult>() : new Nullable<AfxInteropCamCalcResult>(Marshal.PtrToStructure<AfxInteropCamCalcResult>(result)));
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e, owner);
+            }
+        }
+    }
+
+    public class FovCalc : BaseCalc, IDisposable
+    {
+        public delegate void CallbackDelegate(Nullable<AfxInteropFovCalcResult> result);
+
+        public FovCalc(UnityEngine.Object owner, string name, CallbackDelegate callback)
+        {
+            this.owner = owner;
+            this.callback = callback;
+            this.ownCallback = Callback;
+            this.gcHandle = GCHandle.Alloc(this.ownCallback, GCHandleType.Pinned);
+            this.iterator = AfxInteropAddFovCalcCallback(name, ownCallback);
+        }
+
+        private AfxInteropFovCalcCallbackDelegate ownCallback;
+        private CallbackDelegate callback;
+        private UnityEngine.Object owner;
+
+        private void Callback(IntPtr result)
+        {
+            // Exceptions must not go into native code:
+            try
+            {
+                callback(IntPtr.Zero == result ? new Nullable<AfxInteropFovCalcResult>() : new Nullable<AfxInteropFovCalcResult>(Marshal.PtrToStructure<AfxInteropFovCalcResult>(result)));
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e, owner);
+            }
+        }
+    }
+
+    public class BoolCalc : BaseCalc, IDisposable
+    {
+        public delegate void CallbackDelegate(Nullable<AfxInteropBoolCalcResult> result);
+
+        public BoolCalc(UnityEngine.Object owner, string name, CallbackDelegate callback)
+        {
+            this.owner = owner;
+            this.callback = callback;
+            this.ownCallback = Callback;
+            this.gcHandle = GCHandle.Alloc(this.ownCallback, GCHandleType.Pinned);
+            this.iterator = AfxInteropAddBoolCalcCallback(name, ownCallback);
+        }
+
+        private AfxInteropBoolCalcCallbackDelegate ownCallback;
+        private CallbackDelegate callback;
+        private UnityEngine.Object owner;
+
+        private void Callback(IntPtr result)
+        {
+            // Exceptions must not go into native code:
+            try
+            {
+                callback(IntPtr.Zero == result ? new Nullable<AfxInteropBoolCalcResult>() : new Nullable<AfxInteropBoolCalcResult>(Marshal.PtrToStructure<AfxInteropBoolCalcResult>(result)));
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e, owner);
+            }
+        }
+    }
+
+    public class IntCalc : BaseCalc, IDisposable
+    {
+        public delegate void CallbackDelegate(Nullable<AfxInteropIntCalcResult> result);
+
+        public IntCalc(UnityEngine.Object owner, string name, CallbackDelegate callback)
+        {
+            this.owner = owner;
+            this.callback = callback;
+            this.ownCallback = Callback;
+            this.gcHandle = GCHandle.Alloc(this.ownCallback, GCHandleType.Pinned);
+            this.iterator = AfxInteropAddIntCalcCallback(name, ownCallback);
+        }
+
+        private AfxInteropIntCalcCallbackDelegate ownCallback;
+        private CallbackDelegate callback;
+        private UnityEngine.Object owner;
+
+        private void Callback(IntPtr result)
+        {
+            // Exceptions must not go into native code:
+            try
+            {
+                callback(IntPtr.Zero == result ? new Nullable<AfxInteropIntCalcResult>() : new Nullable<AfxInteropIntCalcResult>(Marshal.PtrToStructure<AfxInteropIntCalcResult>(result)));
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e, owner);
+            }
+        }
+    }
+
+
+    /// <summary>
+    /// Commands accessor for reading commands from client and sending them back.<br />
+    /// Should not send too much per one call (might freeze client).<br />
+    /// ATTENTION: It is illegal to hold on to this interface longer than the call of the delegate lasts!
+    /// </summary>
+    public interface ICommands
+    {
+        /// <summary>
+        /// Compute count of commands sent to us.
+        /// </summary>
+        /// <returns>Count of commands sent to us.</returns>
+        UInt32 GetCount();
+
+        /// <summary>
+        /// Get number of arguemnts for a command.
+        /// </summary>
+        /// <param name="commandIndex">Index of command, first is 0.</param>
+        /// <returns></returns>
+        UInt32 GetCommandArgCount(UInt32 commandIndex);
+
+        /// <summary>
+        /// Get argument of a command.
+        /// </summary>
+        /// <param name="commandIndex">Index of command, first is 0.</param>
+        /// <param name="argumentIndex">Index of argument, first is 0.</param>
+        /// <returns></returns>
+        string GetCommandArg(UInt32 commandIndex, UInt32 argumentIndex);
+
+        /// <summary>
+        /// Send a command to the client.
+        /// </summary>
+        /// <param name="command">Command to send.</param>
+        /// <returns>false on fail.</returns>
+        bool ScheduleCommand(string command);
+
+        /// <summary>
+        /// Call this if you can't handle a command to call the next default handler (if any).
+        /// </summary>
+        /// <param name="commandIndex">Index of command, first is 0.</param>
+        /// <returns>true if handled.</returns>
+        bool Fallback(UInt32 commandIndex);
+    }
+
+    /// <summary>
+    /// Callback to handle commands.
+    /// </summary>
+    /// <param name="commands">The commands to handle.</param>
+    /// <returns>True if handled, otherwise false.</returns>    
+    public delegate void AfxInteropCommandsCallbackDelegate(ICommands commands);
+
+    public const float quakeToUntiyScaleFac = (12f / 16f) * (2.54f / 100f); // https://developer.valvesoftware.com/wiki/Dimensions
+
+    public const float unityToQuakeScaleFac = (100f / 2.54f) * (16f / 12f);
+
+    //
+
     public string pipeName = "advancedfxInterop";
 
     public bool suspended = false;
@@ -58,11 +327,9 @@ public class AfxInterop : MonoBehaviour
 
     public bool afxOverrideCameraEnabled = true;
 
+    public AfxInteropCommandsCallbackDelegate afxInteropCommandsCallback;
+
     //
-
-    public const float quakeToUntiyScaleFac = (12f / 16f) * (2.54f / 100f); // https://developer.valvesoftware.com/wiki/Dimensions
-
-    public const float unityToQuakeScaleFac = (100f / 2.54f) * (16f / 12f);
 
     public static Vector3 ToUnityVector(AfxInteropVector value)
     {
@@ -75,6 +342,36 @@ public class AfxInterop : MonoBehaviour
             Quaternion.AngleAxis(-value.Yaw, Vector3.up)
             * Quaternion.AngleAxis(value.Pitch, Vector3.right)
             * Quaternion.AngleAxis(-value.Roll, Vector3.forward);     
+    }
+
+    public static float CsgoFovToRealQuakeFov(float fov, float width, float height)
+    {
+        if (0f == height) return fov;
+
+        float engineAspectRatio = width / height;
+        float defaultAscpectRatio = 4f / 3f;
+        float ratio = engineAspectRatio / defaultAscpectRatio;
+        float halfAngle = 0.5f * fov * Mathf.Deg2Rad;
+        float t = ratio * Mathf.Tan(halfAngle);
+        return 2f * Mathf.Atan(t) * Mathf.Rad2Deg;
+    }
+
+    public static float RealQuakeFovToCsgoFov(float width, float height, float fov)
+    {
+        if (0 == height) return fov;
+
+        float engineAspectRatio = width / height;
+        float defaultAscpectRatio = 4f / 3f;
+        float ratio = engineAspectRatio / defaultAscpectRatio;
+        float t = Mathf.Tan(0.5f * fov * Mathf.Deg2Rad);
+        float halfAngle = Mathf.Atan(t / ratio);
+        return 2f* halfAngle * Mathf.Rad2Deg;
+    }
+
+    public static float ToUnityFov(float value, float width, float height)
+    {
+        float verticalFovDeg = 2f * Mathf.Atan(Mathf.Tan(value * Mathf.Deg2Rad / 2f) * height / width) * Mathf.Rad2Deg;
+        return verticalFovDeg;
     }
 
     public static AfxInteropVector FromUnityVector(Vector3 value)
@@ -162,6 +459,14 @@ public class AfxInterop : MonoBehaviour
         return result;
     }
 
+    public static float FromUnityFov(float value, float width, float height)
+    {
+        float horizontalFovDeg = 2f * Mathf.Atan(Mathf.Tan(value * Mathf.Deg2Rad / 2f) * width / height) * Mathf.Rad2Deg;
+
+        return horizontalFovDeg;
+    }
+
+
     //
 
     public void Awake() {
@@ -235,7 +540,13 @@ public class AfxInterop : MonoBehaviour
 
     void LateUpdate()
     {
-        if (!afxCameraUpdated) return;
+        if (!afxCameraUpdated)
+        {
+            // We still neat to eat the queue from update thread:
+            Graphics.ExecuteCommandBuffer(afxDrawBegin);
+            Graphics.ExecuteCommandBuffer(afxDrawEnd);
+            return;
+        }
 
         afxCameraUpdated = false;
 
@@ -556,20 +867,37 @@ public class AfxInterop : MonoBehaviour
         public Boolean Result;
     }
 
-    public delegate void AfxInteropHandleCalcCallbackDelegate(ref Nullable<AfxInteropHandleCalcResult> result);
+    [StructLayout(LayoutKind.Sequential)]
+    public struct AfxInteropIntCalcResult
+    {
+        public Int32 Result;
+    }
 
-    public delegate void AfxInteropVecAngCalcCallbackDelegate(ref Nullable<AfxInteropVecAngCalcResult> result);
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    delegate void AfxInteropHandleCalcCallbackDelegate(IntPtr result);
 
-    public delegate void AfxInteropCamCalcCallbackDelegate(ref Nullable<AfxInteropCamCalcResult> result);
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    delegate void AfxInteropVecAngCalcCallbackDelegate(IntPtr result);
 
-    public delegate void AfxInteropFovCalcCallbackDelegate(ref Nullable<AfxInteropFovCalcResult> result);
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    delegate void AfxInteropCamCalcCallbackDelegate(IntPtr result);
 
-    public delegate void AfxInteropBoolCalcCallbackDelegate(ref Nullable<AfxInteropBoolCalcResult> result);
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    delegate void AfxInteropFovCalcCallbackDelegate(IntPtr result);
 
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    delegate void AfxInteropBoolCalcCallbackDelegate(IntPtr result);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    delegate void AfxInteropIntCalcCallbackDelegate(IntPtr result);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     delegate void AfxInteropCommandsDelegate(IntPtr commands);
 
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     delegate bool AfxInteropOnRenderViewCallbackDelegate(ref float TX, ref float Ty, ref float Tz, ref float Rx, ref float Ry, ref float Rz, ref float Fov);
 
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     delegate void AfxInteropRenderDelegate(ref AfxInteropRenderInfo renderInfo, out bool outColorTextureWasLost, out IntPtr outSharedColorTextureHandle, out bool outColorDepthTextureWasLost, out IntPtr outSharedColorDepthTextureHandle);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
@@ -603,7 +931,7 @@ public class AfxInterop : MonoBehaviour
     private static extern void AfxInteropDestroy();
 
     [DllImport("AfxHookUnity")]
-    private static extern bool AfxInteropCreate([MarshalAs(UnmanagedType.LPStr)] string pipeName, AfxInteropCommandsDelegate afxInteropCommands, AfxInteropRenderDelegate afxInteropRender);
+    private static extern bool AfxInteropCreate([MarshalAs(UnmanagedType.LPStr)] string pipeName, [MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropCommandsDelegate afxInteropCommands, [MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropRenderDelegate afxInteropRender);
 
     [DllImport("AfxHookUnity")]
     private static extern bool AfxInteropUpdateEngineThread();
@@ -612,30 +940,34 @@ public class AfxInterop : MonoBehaviour
     private static extern bool AfxInteropScheduleCommand([MarshalAs(UnmanagedType.LPStr)] string command);
 
     [DllImport("AfxHookUnity")]
-    private static extern void AfxInteropSetOnRenderViewCallback(AfxInteropOnRenderViewCallbackDelegate callback);
+    private static extern void AfxInteropSetOnRenderViewCallback([MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropOnRenderViewCallbackDelegate callback);
 
     /// <returns>Iterator that has to be unregisterred with AfxInteropRemoveCallback, before the delgate is move or removed.</returns>
     [DllImport("AfxHookUnity")]
-    public static extern IntPtr AfxInteropAddHandleCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, AfxInteropHandleCalcCallbackDelegate callback);
+    private static extern IntPtr AfxInteropAddHandleCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropHandleCalcCallbackDelegate callback);
 
     /// <returns>Iterator that has to be unregisterred with AfxInteropRemoveCallback, before the delgate is move or removed.</returns>
     [DllImport("AfxHookUnity")]
-    public static extern IntPtr AfxInteropVecAngCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, AfxInteropVecAngCalcCallbackDelegate callback);
+    private static extern IntPtr AfxInteropAddVecAngCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropVecAngCalcCallbackDelegate callback);
 
     /// <returns>Iterator that has to be unregisterred with AfxInteropRemoveCallback, before the delgate is move or removed.</returns>
     [DllImport("AfxHookUnity")]
-    public static extern IntPtr AfxInteropAddCamCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, AfxInteropCamCalcCallbackDelegate callback);
+    private static extern IntPtr AfxInteropAddCamCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropCamCalcCallbackDelegate callback);
 
     /// <returns>Iterator that has to be unregisterred with AfxInteropRemoveCallback, before the delgate is move or removed.</returns>
     [DllImport("AfxHookUnity")]
-    public static extern IntPtr AfxInteropAddFovCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, AfxInteropFovCalcCallbackDelegate callback);
+    private static extern IntPtr AfxInteropAddFovCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropFovCalcCallbackDelegate callback);
 
     /// <returns>Iterator that has to be unregisterred with AfxInteropRemoveCallback, before the delgate is move or removed.</returns>
     [DllImport("AfxHookUnity")]
-    public static extern IntPtr AfxInteropAddBoolCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, AfxInteropBoolCalcCallbackDelegate callback);
+    private static extern IntPtr AfxInteropAddBoolCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropBoolCalcCallbackDelegate callback);
+
+    /// <returns>Iterator that has to be unregisterred with AfxInteropRemoveCallback, before the delgate is move or removed.</returns>
+    [DllImport("AfxHookUnity")]
+    private static extern IntPtr AfxInteropAddIntCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropIntCalcCallbackDelegate callback);
 
     [DllImport("AfxHookUnity")]
-    public static extern void AfxInteropRemoveCallback(IntPtr iterator);
+    private static extern void AfxInteropRemoveCallback(IntPtr iterator);
 
     private class SurfaceData : IDisposable
     {
@@ -730,53 +1062,140 @@ public class AfxInterop : MonoBehaviour
         }
     }
 
+    class AfxInteropCommandsWrapper : ICommands
+    {
+        public UInt32 GetCount()
+        {
+            CheckValid();
+
+            return AfxInteropCommands_GetCommandCount(commands);
+        }
+
+        public UInt32 GetCommandArgCount(UInt32 commandIndex)
+        {
+            CheckValid();
+
+            return AfxInteropCommands_GetCommandArgCount(commands, commandIndex);
+        }
+
+        public string GetCommandArg(UInt32 commandIndex, UInt32 argumentIndex)
+        {
+            CheckValid();
+
+            return DoAfxInteropCommands_GetCommandArg(commands, commandIndex, argumentIndex);
+        }
+
+        public bool ScheduleCommand(string command)
+        {
+            CheckValid();
+
+            return AfxInteropScheduleCommand(command);
+        }
+
+        public bool Fallback(UInt32 commandIndex)
+        {
+            CheckValid();
+
+            UInt32 argCount = GetCommandArgCount(commandIndex);
+
+            if (0 < argCount)
+            {
+                string arg0 = GetCommandArg(commandIndex, 0);
+
+                if (2 <= argCount)
+                {
+                    string arg1 = GetCommandArg(commandIndex, 1);
+
+                    if (0 == arg1.CompareTo("afx"))
+                    {
+                        if (4 == argCount)
+                        {
+                            string arg2 = GetCommandArg(commandIndex, 2);
+                            string arg3 = GetCommandArg(commandIndex, 3);
+
+                            if (0 == arg2.CompareTo("suspended"))
+                            {
+                                int value;
+
+                                if (int.TryParse(arg3, out value))
+                                    afxInterop.suspended = 0 != value;
+
+                                return true;
+                            }
+                        }
+                    }
+
+                }
+
+                ScheduleCommand("echo " + arg0 + " afx suspended 0|1 - Suspend / resume rendering.\n");
+
+                return true;
+            }
+
+            return false;
+        }
+
+        public AfxInteropCommandsWrapper(IntPtr commands, AfxInterop afxInterop)
+        {
+            this.commands = commands;
+            this.afxInterop = afxInterop;
+        }
+
+        public void Invalidate()
+        {
+            valid = false;
+        }
+
+        private IntPtr commands;
+        private bool valid = true;
+        private AfxInterop afxInterop;
+
+        private void CheckValid()
+        {
+            if(!valid)
+            {
+                throw new System.ApplicationException("IAfxInteropCommands used outside of valid scope.");
+            }
+        }
+    }
+
+
     void AfxInteropCommands(IntPtr commands)
     {
+        AfxInteropCommandsWrapper afxInteropCommandsWrapper = null;
+
         // Exceptions must not make it into native code (this is called from native code):
         try
         {
-            UInt32 commandCount = AfxInteropCommands_GetCommandCount(commands);
+            bool handled = false;
 
-            for (UInt32 i = 0; i < commandCount; ++i)
+            afxInteropCommandsWrapper = new AfxInteropCommandsWrapper(commands, this);
+
+            if(null != afxInteropCommandsCallback)
             {
-                UInt32 argCount = AfxInteropCommands_GetCommandArgCount(commands, i);
+                afxInteropCommandsCallback(afxInteropCommandsWrapper);
+                handled = true;
+            }
 
-                if (0 < argCount)
+            if (!handled)
+            {
+                // Default implementation:
+
+                UInt32 commandCount = afxInteropCommandsWrapper.GetCount();
+
+                for (UInt32 i = 0; i < commandCount; ++i)
                 {
-                    string arg0 = DoAfxInteropCommands_GetCommandArg(commands, i, 0);
-
-                    if (2 <= argCount)
-                    {
-                        string arg1 = DoAfxInteropCommands_GetCommandArg(commands, i, 1);
-
-                        if (0 == arg1.CompareTo("afx"))
-                        {
-                            if (4 == argCount)
-                            {
-                                string arg2 = DoAfxInteropCommands_GetCommandArg(commands, i, 2);
-                                string arg3 = DoAfxInteropCommands_GetCommandArg(commands, i, 3);
-
-                                if (0 == arg2.CompareTo("suspended"))
-                                {
-                                    int value;
-
-                                    if (int.TryParse(arg3, out value))
-                                        this.suspended = 0 != value;
-
-                                    continue;
-                                }
-                            }
-                        }
-
-                    }
-
-                    AfxInteropScheduleCommand("echo " + arg0 + " afx suspended 0|1 - Suspend / resume rendering.\n");
+                    afxInteropCommandsWrapper.Fallback(i);
                 }
             }
         }
         catch (Exception e)
         {
             Debug.LogException(e, this);
+        }
+        finally
+        {
+            if (null != afxInteropCommandsWrapper) afxInteropCommandsWrapper.Invalidate();
         }
     }
 
@@ -837,9 +1256,6 @@ public class AfxInterop : MonoBehaviour
 
             if (this.suspended)
             {
-                GL.IssuePluginEvent(AfxHookUnityGetRenderEventFunc(), 2);
-                GL.IssuePluginEvent(AfxHookUnityGetRenderEventFunc(), 3);
-
                 return;
             }
 
@@ -993,7 +1409,7 @@ public class AfxInterop : MonoBehaviour
         }
     }
 
-    string DoAfxInteropCommands_GetCommandArg(IntPtr commands, UInt32 index, UInt32 argIndex)
+    static string DoAfxInteropCommands_GetCommandArg(IntPtr commands, UInt32 index, UInt32 argIndex)
     {
         return Marshal.PtrToStringAnsi(AfxInteropCommands_GetCommandArg(commands, index, argIndex));
     }
