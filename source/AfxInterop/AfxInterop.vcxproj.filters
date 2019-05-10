@@ -1,0 +1,60 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="AfxInterop">
+      <UniqueIdentifier>{681e6be2-8791-4547-ac3d-61e468af2edf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="shared">
+      <UniqueIdentifier>{6bc35703-d336-47fe-afde-72de40362a4b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="shared\Detours">
+      <UniqueIdentifier>{683b5952-e053-4310-999d-6bccb18510db}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="shared\Detours\src">
+      <UniqueIdentifier>{8b58a2ec-2fdc-4fcd-921d-ef8fe321c21f}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="dllmain.cpp">
+      <Filter>AfxInterop</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\Detours\src\modules.cpp">
+      <Filter>shared\Detours\src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\Detours\src\detours.cpp">
+      <Filter>shared\Detours\src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\Detours\src\disasm.cpp">
+      <Filter>shared\Detours\src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\Detours\src\disolarm.cpp">
+      <Filter>shared\Detours\src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\Detours\src\disolarm64.cpp">
+      <Filter>shared\Detours\src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\Detours\src\disolia64.cpp">
+      <Filter>shared\Detours\src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\Detours\src\disolx64.cpp">
+      <Filter>shared\Detours\src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\Detours\src\disolx86.cpp">
+      <Filter>shared\Detours\src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shared\Detours\src\image.cpp">
+      <Filter>shared\Detours\src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="stdafx.h">
+      <Filter>AfxInterop</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\Detours\src\detours.h">
+      <Filter>shared\Detours\src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\shared\Detours\src\detver.h">
+      <Filter>shared\Detours\src</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

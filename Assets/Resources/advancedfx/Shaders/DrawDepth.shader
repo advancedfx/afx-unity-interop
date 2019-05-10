@@ -1,9 +1,9 @@
-﻿Shader "Unlit/DrawpDepth"
+﻿Shader "Unlit/DrawDepth"
 {
 	Properties
 	{
 		_MainTex ("Texture", 2D) = "white" {}
-		_ZParams ("ZParams (near,far,0,0)", Vector) = (0,1,0,0) 
+		_ZParams ("ZParams (near,far,0,1)", Vector) = (0,1,0,1) 
 	}
 	SubShader
 	{

@@ -49,7 +49,9 @@ w =  100 / 2.54 * unityY
 
 // TODO: Might leak texture handles. Not anymore? Dunno.
 
-public class AfxInterop : MonoBehaviour
+[DisallowMultipleComponent]
+[RequireComponent(typeof(Camera))]
+public class AfxInterop : UnityEngine.Rendering.LWRP.AfxInteropBase
 {
     public class BaseCalc : IDisposable
     {
@@ -341,7 +343,7 @@ public class AfxInterop : MonoBehaviour
         return
             Quaternion.AngleAxis(-value.Yaw, Vector3.up)
             * Quaternion.AngleAxis(value.Pitch, Vector3.right)
-            * Quaternion.AngleAxis(-value.Roll, Vector3.forward);     
+            * Quaternion.AngleAxis(-value.Roll, Vector3.forward);
     }
 
     public static float CsgoFovToRealQuakeFov(float fov, float width, float height)
@@ -365,7 +367,7 @@ public class AfxInterop : MonoBehaviour
         float ratio = engineAspectRatio / defaultAscpectRatio;
         float t = Mathf.Tan(0.5f * fov * Mathf.Deg2Rad);
         float halfAngle = Mathf.Atan(t / ratio);
-        return 2f* halfAngle * Mathf.Rad2Deg;
+        return 2f * halfAngle * Mathf.Rad2Deg;
     }
 
     public static float ToUnityFov(float value, float width, float height)
@@ -466,51 +468,70 @@ public class AfxInterop : MonoBehaviour
         return horizontalFovDeg;
     }
 
+    //
+
+    public override bool GetAfxActive()
+    {
+        return afxActive;
+    }
+
+    public override CommandBuffer GetAfxBegin()
+    {
+        if (afxActive) return afxDrawBegin;
+        return null;
+    }
+
+    public override CommandBuffer GetAfxEnd()
+    {
+        if (afxActive) return afxDrawEnd;
+        return null;
+    }
+
+
+    public override CommandBuffer GetAfxLoadDepth()
+    {
+        if (afxActive) return afxDrawDepth;
+        return null;
+    }
 
     //
 
-    public void Awake() {
+    public void Awake()
+    {
 
-        if (IntPtr.Zero == GetModuleHandle("AfxHookUnity.dll"))
-        {
-            Debug.LogError("AfxHookUnity.dll is not injected. It needs to be injected into Unity early.");
-        }
-
-        if (!AfxHookUnityInit(3))
-            Debug.LogError("AfxHookUnityInit failed (version mismatch or init failed).");
+        if (4 != AfxInteropVersion())
+            Debug.LogError("AfxInterop.dll version mismatch (try to rebuild).");
 
         Application.runInBackground = true; // don't sleep when not having focus
         QualitySettings.vSyncCount = 0; // render as fast as possible
 
+        this.drawColorMaterial = Resources.Load("advancedfx/Materials/DrawColor") as Material;
         this.drawDepthMaterial = Resources.Load("advancedfx/Materials/DrawDepth") as Material;
 
         afxDrawBegin = new CommandBuffer();
-        afxDrawBegin.name = "AfxHookUnity: AfxDrawBeginCallBack.";
-        afxDrawBegin.IssuePluginEvent(AfxHookUnityGetRenderEventFunc(), 2);
-        afxDrawBegin.SetInvertCulling(true);
-
+        afxDrawDepth = new CommandBuffer();
         afxDrawEnd = new CommandBuffer();
-        afxDrawEnd.name = "AfxHookUnity: AfxDrawEndCallBack.";
-        afxDrawEnd.SetInvertCulling(false);
-        afxDrawEnd.IssuePluginEvent(AfxHookUnityGetRenderEventFunc(), 3);
 
         m_AfxInteropCommandsDelegate += AfxInteropCommands;
         m_AfxInteropRenderDelegate += AfxInteropRender;
-        m_AfxInteropOnRenderViewCallbackDelegate += AfxInteropOnRenderView;
+        m_AfxInteropRenderPassDelegate += AfxInteropRenderPass;
+        m_AfxInteropOnViewOverrideCallbackDelegate += AfxInteropOnViewOverride;
     }
 
-    public void OnEnable() {
+    public void OnEnable()
+    {
 
-        AfxInteropSetOnRenderViewCallback(m_AfxInteropOnRenderViewCallbackDelegate);
+        AfxInteropSetOnViewOverrideCallback(m_AfxInteropOnViewOverrideCallbackDelegate);
 
-        AfxInteropCreate(pipeName, m_AfxInteropCommandsDelegate, m_AfxInteropRenderDelegate);
+        AfxInteropCreate(pipeName, m_AfxInteropCommandsDelegate, m_AfxInteropRenderDelegate, m_AfxInteropRenderPassDelegate);
     }
 
-    public void OnDisable() {       
+    public void OnDisable()
+    {
 
         AfxInteropDestroy();
 
-        AfxInteropSetOnRenderViewCallback(null);
+        AfxInteropSetOnViewOverrideCallback(null);
 
         if (null != m_ReplacementSurface)
         {
@@ -526,7 +547,7 @@ public class AfxInterop : MonoBehaviour
 
         if (null != afxCamera)
         {
-            afxCamera.allowHDR = false;
+            afxCamera.allowHDR = true;
             afxCamera.allowMSAA = false;
             afxCamera.allowDynamicResolution = false;
         }
@@ -542,28 +563,20 @@ public class AfxInterop : MonoBehaviour
     {
         if (!afxCameraUpdated)
         {
-            // We still neat to eat the queue from update thread:
-            Graphics.ExecuteCommandBuffer(afxDrawBegin);
-            Graphics.ExecuteCommandBuffer(afxDrawEnd);
             return;
         }
 
         afxCameraUpdated = false;
 
-        Graphics.ExecuteCommandBuffer(afxDrawBegin);
-
-        if (null != afxDrawDepth) afxCamera.AddCommandBuffer(CameraEvent.BeforeForwardOpaque, afxDrawDepth);
-
-        //
-
+        afxActive = true;
+        GL.invertCulling = true;
         afxCamera.Render();
+        GL.invertCulling = false;
+        afxActive = false;
 
         //
 
-        if (null != afxDrawDepth) { afxCamera.RemoveCommandBuffer(CameraEvent.BeforeForwardOpaque, afxDrawDepth); afxDrawDepth = null; }
-
-        Graphics.ExecuteCommandBuffer(afxDrawEnd);
-
+        this.drawColorMaterial.mainTexture = null;
         this.drawDepthMaterial.mainTexture = null;
         afxCamera.targetTexture = null;
         afxCamera.clearFlags = afxOldCameraClearFlags;
@@ -769,8 +782,10 @@ public class AfxInterop : MonoBehaviour
         private UInt32 m_MultiSampleQuality;
     }
 
+    private Material drawColorMaterial;
     private Material drawDepthMaterial;
 
+    private bool afxActive = false;
     private bool afxCameraUpdated = false;
     private Camera afxCamera;
     private CommandBuffer afxDrawBegin;
@@ -782,7 +797,17 @@ public class AfxInterop : MonoBehaviour
 
     AfxInteropCommandsDelegate m_AfxInteropCommandsDelegate;
     AfxInteropRenderDelegate m_AfxInteropRenderDelegate;
-    AfxInteropOnRenderViewCallbackDelegate m_AfxInteropOnRenderViewCallbackDelegate;
+    AfxInteropRenderPassDelegate m_AfxInteropRenderPassDelegate;
+    AfxInteropOnViewOverrideCallbackDelegate m_AfxInteropOnViewOverrideCallbackDelegate;
+
+
+    enum AfxRenderPassType : UInt32
+    {
+        AfxRenderPassType_BeforeTranslucentShadow = 2,
+        AfxRenderPassType_AfterTranslucentShadow = 3,
+        AfxRenderPassType_BeforeTranslucent = 4,
+        AfxRenderPassType_AfterTranslucent = 5
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     public struct AfxInteropMatrix4x4
@@ -806,12 +831,21 @@ public class AfxInterop : MonoBehaviour
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    public struct AfxInteropRenderInfo
+    public struct AfxInteropView
     {
+        public Int32 X;
+        public Int32 Y;
         public Int32 Width;
         public Int32 Height;
         public AfxInteropMatrix4x4 ViewMatrix;
         public AfxInteropMatrix4x4 ProjectionMatrix;
+    }
+
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct AfxInteropRenderInfo
+    {
+        public AfxInteropView View;
         public Int32 FrameCount;
         public Single AbsoluteFrameTime;
         public Single CurTime;
@@ -895,78 +929,85 @@ public class AfxInterop : MonoBehaviour
     delegate void AfxInteropCommandsDelegate(IntPtr commands);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-    delegate bool AfxInteropOnRenderViewCallbackDelegate(ref float TX, ref float Ty, ref float Tz, ref float Rx, ref float Ry, ref float Rz, ref float Fov);
+    delegate bool AfxInteropOnViewOverrideCallbackDelegate(ref float TX, ref float Ty, ref float Tz, ref float Rx, ref float Ry, ref float Rz, ref float Fov);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-    delegate void AfxInteropRenderDelegate(ref AfxInteropRenderInfo renderInfo, out bool outColorTextureWasLost, out IntPtr outSharedColorTextureHandle, out bool outColorDepthTextureWasLost, out IntPtr outSharedColorDepthTextureHandle);
+    delegate void AfxInteropRenderDelegate(
+        ref AfxInteropRenderInfo renderInfo, out bool outColorTextureWasLost, out IntPtr outSharedColorTextureHandle, out bool outColorDepthTextureWasLost, out IntPtr outSharedColorDepthTextureHandle,
+        out bool outBeforeTranslucentShadow, out bool outAfterTranslucentShadow,
+        out bool outBeforeTranslucent, out bool outAfterTranslucent,
+        out bool outBeforeHud, out bool outAfterHud);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    delegate void AfxInteropRenderPassDelegate(AfxRenderPassType pass, ref AfxInteropView view);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
     private static extern IntPtr GetModuleHandle(string lpModuleName);
 
-    [DllImport ("AfxHookUnity")]
-	private static extern bool AfxHookUnityInit(int version);
+    [DllImport("AfxInterop")]
+    private static extern int AfxInteropVersion();
 
-    [DllImport("AfxHookUnity")]
-    private static extern IntPtr AfxHookUnityGetSharedHandle(IntPtr d3d11ResourcePtr);
+    [DllImport("AfxInterop")]
+    private static extern void AfxInteropBeginCreateRenderTexture();
 
-    [DllImport("AfxHookUnity")]
-    private static extern void AfxHookUnityBeginCreateRenderTexture();
+    [DllImport("AfxInterop")]
+    private static extern IntPtr AfxInteropGetSharedHandle(IntPtr d3d11ResourcePtr);
 
-    [DllImport("AfxHookUnity")]
-    private static extern IntPtr AfxHookUnityGetRenderEventFunc();
+    [DllImport("AfxInterop")]
+    private static extern IntPtr AfxInteropGetRenderEventFunc();
 
-    [DllImport("AfxHookUnity")]
-    private static extern IntPtr AfxHookUnityGetRenderEventAndDataFunc();
+    [DllImport("AfxInterop")]
+    private static extern IntPtr AfxInteropGetRenderEventAndDataFunc();
 
-    [DllImport("AfxHookUnity")]
+    [DllImport("AfxInterop")]
     private static extern UInt32 AfxInteropCommands_GetCommandCount(IntPtr commands);
 
-    [DllImport("AfxHookUnity")]
+    [DllImport("AfxInterop")]
     private static extern UInt32 AfxInteropCommands_GetCommandArgCount(IntPtr commands, UInt32 index);
 
-    [DllImport("AfxHookUnity")]
+    [DllImport("AfxInterop")]
     private static extern IntPtr AfxInteropCommands_GetCommandArg(IntPtr commands, UInt32 index, UInt32 argIndex);
 
-    [DllImport("AfxHookUnity")]
+    [DllImport("AfxInterop")]
     private static extern void AfxInteropDestroy();
 
-    [DllImport("AfxHookUnity")]
-    private static extern bool AfxInteropCreate([MarshalAs(UnmanagedType.LPStr)] string pipeName, [MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropCommandsDelegate afxInteropCommands, [MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropRenderDelegate afxInteropRender);
+    [DllImport("AfxInterop")]
+    private static extern bool AfxInteropCreate([MarshalAs(UnmanagedType.LPStr)] string pipeName, [MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropCommandsDelegate afxInteropCommands, [MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropRenderDelegate afxInteropRender, [MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropRenderPassDelegate afxInteropRenderPass);
 
-    [DllImport("AfxHookUnity")]
+    [DllImport("AfxInterop")]
     private static extern bool AfxInteropUpdateEngineThread();
 
-    [DllImport("AfxHookUnity")]
+    [DllImport("AfxInterop")]
     private static extern bool AfxInteropScheduleCommand([MarshalAs(UnmanagedType.LPStr)] string command);
 
-    [DllImport("AfxHookUnity")]
-    private static extern void AfxInteropSetOnRenderViewCallback([MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropOnRenderViewCallbackDelegate callback);
+    [DllImport("AfxInterop")]
+    private static extern void AfxInteropSetOnViewOverrideCallback([MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropOnViewOverrideCallbackDelegate callback);
 
     /// <returns>Iterator that has to be unregisterred with AfxInteropRemoveCallback, before the delgate is move or removed.</returns>
-    [DllImport("AfxHookUnity")]
+    [DllImport("AfxInterop")]
     private static extern IntPtr AfxInteropAddHandleCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropHandleCalcCallbackDelegate callback);
 
     /// <returns>Iterator that has to be unregisterred with AfxInteropRemoveCallback, before the delgate is move or removed.</returns>
-    [DllImport("AfxHookUnity")]
+    [DllImport("AfxInterop")]
     private static extern IntPtr AfxInteropAddVecAngCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropVecAngCalcCallbackDelegate callback);
 
     /// <returns>Iterator that has to be unregisterred with AfxInteropRemoveCallback, before the delgate is move or removed.</returns>
-    [DllImport("AfxHookUnity")]
+    [DllImport("AfxInterop")]
     private static extern IntPtr AfxInteropAddCamCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropCamCalcCallbackDelegate callback);
 
     /// <returns>Iterator that has to be unregisterred with AfxInteropRemoveCallback, before the delgate is move or removed.</returns>
-    [DllImport("AfxHookUnity")]
+    [DllImport("AfxInterop")]
     private static extern IntPtr AfxInteropAddFovCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropFovCalcCallbackDelegate callback);
 
     /// <returns>Iterator that has to be unregisterred with AfxInteropRemoveCallback, before the delgate is move or removed.</returns>
-    [DllImport("AfxHookUnity")]
+    [DllImport("AfxInterop")]
     private static extern IntPtr AfxInteropAddBoolCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropBoolCalcCallbackDelegate callback);
 
     /// <returns>Iterator that has to be unregisterred with AfxInteropRemoveCallback, before the delgate is move or removed.</returns>
-    [DllImport("AfxHookUnity")]
+    [DllImport("AfxInterop")]
     private static extern IntPtr AfxInteropAddIntCalcCallback([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.FunctionPtr)]AfxInteropIntCalcCallbackDelegate callback);
 
-    [DllImport("AfxHookUnity")]
+    [DllImport("AfxInterop")]
     private static extern void AfxInteropRemoveCallback(IntPtr iterator);
 
     private class SurfaceData : IDisposable
@@ -981,24 +1022,29 @@ public class AfxInterop : MonoBehaviour
             IntPtr sharedDepthTextureHandle = IntPtr.Zero;
 
             Nullable<RenderTextureDescriptor> rdesc;
-            
+
             rdesc = GetRenderTextureDescriptor(surfaceInfo, false);
             if (rdesc.HasValue)
             {
-                AfxHookUnityBeginCreateRenderTexture();
+                cameraTexture = new RenderTexture(rdesc.Value);
+                cameraTexture.depth = 32;
+
                 colorTexture = new RenderTexture(rdesc.Value);
+                colorTexture.DiscardContents(false, true);
+                AfxInteropBeginCreateRenderTexture();
                 colorTexture.Create();
-                sharedColorTextureHandle = AfxHookUnityGetSharedHandle(colorTexture.GetNativeTexturePtr());
+                sharedColorTextureHandle = AfxInteropGetSharedHandle(colorTexture.GetNativeTexturePtr());
                 Debug.Log("Color: " + colorTexture.GetNativeTexturePtr() + " -> " + sharedColorTextureHandle);
             }
 
-            rdesc = GetRenderTextureDescriptor(surfaceInfo, true);
+            rdesc = GetRenderTextureDescriptor(surfaceInfo, false);
             if (rdesc.HasValue)
             {
-                AfxHookUnityBeginCreateRenderTexture();
                 depthTexture = new RenderTexture(rdesc.Value);
+                depthTexture.DiscardContents(false, true);
+                AfxInteropBeginCreateRenderTexture();
                 depthTexture.Create();
-                sharedDepthTextureHandle = AfxHookUnityGetSharedHandle(depthTexture.GetNativeTexturePtr());
+                sharedDepthTextureHandle = AfxInteropGetSharedHandle(depthTexture.GetNativeTexturePtr());
                 Debug.Log("Depth: " + depthTexture.GetNativeTexturePtr() + " -> " + sharedDepthTextureHandle);
             }
 
@@ -1027,6 +1073,7 @@ public class AfxInterop : MonoBehaviour
             disposed = true;
         }
 
+        public readonly RenderTexture cameraTexture;
         public readonly ISurfaceInfo surfaceInfo;
         public readonly RenderTexture colorTexture;
         public readonly IntPtr sharedColorTextureHandle;
@@ -1035,21 +1082,21 @@ public class AfxInterop : MonoBehaviour
 
         private Nullable<RenderTextureDescriptor> GetRenderTextureDescriptor(ISurfaceInfo fbSurfaceInfo, bool isDepth)
         {
-            RenderTextureDescriptor desc = new RenderTextureDescriptor((int)fbSurfaceInfo.Width, (int)fbSurfaceInfo.Height);
-
-            Debug.Log("GetRenderTextureDescriptor: " + fbSurfaceInfo.Id + "(" + (isDepth ? "depth" : "color") +")" + ": " + fbSurfaceInfo.Format + " (" + fbSurfaceInfo.Width + "," + fbSurfaceInfo.Height + ")");
+            UnityEngine.Experimental.Rendering.GraphicsFormat graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.None;
 
             switch (fbSurfaceInfo.Format)
             {
                 case D3DFORMAT.D3DFMT_A8R8G8B8:
-                    desc.colorFormat = RenderTextureFormat.BGRA32;
+                    graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.B8G8R8A8_UNorm;
                     break;
                 default:
                     Debug.LogError("Unknown back buffer format: " + fbSurfaceInfo.Format);
                     return null;
             }
 
-            desc.depthBufferBits = isDepth ? 0 : 32;
+            RenderTextureDescriptor desc = new RenderTextureDescriptor((int)fbSurfaceInfo.Width, (int)fbSurfaceInfo.Height, graphicsFormat, isDepth ? 0 : 24);
+
+            Debug.Log("GetRenderTextureDescriptor: " + fbSurfaceInfo.Id + "(" + (isDepth ? "depth" : "color") + ")" + ": " + fbSurfaceInfo.Format + " (" + fbSurfaceInfo.Width + "," + fbSurfaceInfo.Height + ")");
 
             desc.autoGenerateMips = false;
             desc.bindMS = false;
@@ -1152,7 +1199,7 @@ public class AfxInterop : MonoBehaviour
 
         private void CheckValid()
         {
-            if(!valid)
+            if (!valid)
             {
                 throw new System.ApplicationException("IAfxInteropCommands used outside of valid scope.");
             }
@@ -1171,7 +1218,7 @@ public class AfxInterop : MonoBehaviour
 
             afxInteropCommandsWrapper = new AfxInteropCommandsWrapper(commands, this);
 
-            if(null != afxInteropCommandsCallback)
+            if (null != afxInteropCommandsCallback)
             {
                 afxInteropCommandsCallback(afxInteropCommandsWrapper);
                 handled = true;
@@ -1199,7 +1246,11 @@ public class AfxInterop : MonoBehaviour
         }
     }
 
-    void AfxInteropRender(ref AfxInteropRenderInfo renderInfo, out bool outColorTextureWasLost, out IntPtr outSharedColorTextureHandle, out bool outColorDepthTextureWasLost, out IntPtr outSharedColorDepthTextureHandle)
+    void AfxInteropRender(
+        ref AfxInteropRenderInfo renderInfo, out bool outColorTextureWasLost, out IntPtr outSharedColorTextureHandle, out bool outColorDepthTextureWasLost, out IntPtr outSharedColorDepthTextureHandle,
+        out bool outBeforeTranslucentShadow, out bool outAfterTranslucentShadow,
+        out bool outBeforeTranslucent, out bool outAfterTranslucent,
+        out bool outBeforeHud, out bool outAfterHud)
     {
         // Exceptions must not make it into native code (this is called from native code):
         try
@@ -1213,7 +1264,7 @@ public class AfxInterop : MonoBehaviour
 
             bool wasLost = false;
 
-            if (null != m_ReplacementSurface && (m_ReplacementSurface.colorTexture.width != renderInfo.Width || m_ReplacementSurface.colorTexture.height != renderInfo.Height))
+            if (null != m_ReplacementSurface && (m_ReplacementSurface.colorTexture.width != renderInfo.View.Width || m_ReplacementSurface.colorTexture.height != renderInfo.View.Height))
             {
                 m_ReplacementSurface.Dispose();
                 m_ReplacementSurface = null;
@@ -1225,8 +1276,8 @@ public class AfxInterop : MonoBehaviour
 
                 SurfaceInfo surfaceInfo = new SurfaceInfo();
                 surfaceInfo.Id = IntPtr.Zero;
-                surfaceInfo.Width = (UInt32)renderInfo.Width;
-                surfaceInfo.Height = (UInt32)renderInfo.Height;
+                surfaceInfo.Width = (UInt32)renderInfo.View.Width;
+                surfaceInfo.Height = (UInt32)renderInfo.View.Height;
                 surfaceInfo.Usage = D3DUSAGE.D3DUSAGE_RENDERTARGET;
                 surfaceInfo.Format = D3DFORMAT.D3DFMT_A8R8G8B8;
                 surfaceInfo.Pool = D3DPOOL.D3DPOOL_DEFAULT;
@@ -1254,6 +1305,10 @@ public class AfxInterop : MonoBehaviour
             outColorDepthTextureWasLost = wasLost;
             outSharedColorDepthTextureHandle = m_ReplacementSurface.sharedDepthTextureHandle;
 
+            outBeforeTranslucentShadow = false; outAfterTranslucentShadow = false;
+            outBeforeTranslucent = false; outAfterTranslucent = false;
+            outBeforeHud = false; outAfterHud = false;
+
             if (this.suspended)
             {
                 return;
@@ -1261,44 +1316,46 @@ public class AfxInterop : MonoBehaviour
 
             if (null == afxCamera) return;
 
+            outBeforeHud = true;
+
             {
-                int width = renderInfo.Width;
-                int height = renderInfo.Height;
+                int width = renderInfo.View.Width;
+                int height = renderInfo.View.Height;
 
                 Matrix4x4 d3d9QuakeWorldToView = new Matrix4x4();
-                d3d9QuakeWorldToView[0, 0] = renderInfo.ViewMatrix.M00;
-                d3d9QuakeWorldToView[0, 1] = renderInfo.ViewMatrix.M01;
-                d3d9QuakeWorldToView[0, 2] = renderInfo.ViewMatrix.M02;
-                d3d9QuakeWorldToView[0, 3] = renderInfo.ViewMatrix.M03;
-                d3d9QuakeWorldToView[1, 0] = renderInfo.ViewMatrix.M10;
-                d3d9QuakeWorldToView[1, 1] = renderInfo.ViewMatrix.M11;
-                d3d9QuakeWorldToView[1, 2] = renderInfo.ViewMatrix.M12;
-                d3d9QuakeWorldToView[1, 3] = renderInfo.ViewMatrix.M13;
-                d3d9QuakeWorldToView[2, 0] = renderInfo.ViewMatrix.M20;
-                d3d9QuakeWorldToView[2, 1] = renderInfo.ViewMatrix.M21;
-                d3d9QuakeWorldToView[2, 2] = renderInfo.ViewMatrix.M22;
-                d3d9QuakeWorldToView[2, 3] = renderInfo.ViewMatrix.M23;
-                d3d9QuakeWorldToView[3, 0] = renderInfo.ViewMatrix.M30;
-                d3d9QuakeWorldToView[3, 1] = renderInfo.ViewMatrix.M31;
-                d3d9QuakeWorldToView[3, 2] = renderInfo.ViewMatrix.M32;
-                d3d9QuakeWorldToView[3, 3] = renderInfo.ViewMatrix.M33;
+                d3d9QuakeWorldToView[0, 0] = renderInfo.View.ViewMatrix.M00;
+                d3d9QuakeWorldToView[0, 1] = renderInfo.View.ViewMatrix.M01;
+                d3d9QuakeWorldToView[0, 2] = renderInfo.View.ViewMatrix.M02;
+                d3d9QuakeWorldToView[0, 3] = renderInfo.View.ViewMatrix.M03;
+                d3d9QuakeWorldToView[1, 0] = renderInfo.View.ViewMatrix.M10;
+                d3d9QuakeWorldToView[1, 1] = renderInfo.View.ViewMatrix.M11;
+                d3d9QuakeWorldToView[1, 2] = renderInfo.View.ViewMatrix.M12;
+                d3d9QuakeWorldToView[1, 3] = renderInfo.View.ViewMatrix.M13;
+                d3d9QuakeWorldToView[2, 0] = renderInfo.View.ViewMatrix.M20;
+                d3d9QuakeWorldToView[2, 1] = renderInfo.View.ViewMatrix.M21;
+                d3d9QuakeWorldToView[2, 2] = renderInfo.View.ViewMatrix.M22;
+                d3d9QuakeWorldToView[2, 3] = renderInfo.View.ViewMatrix.M23;
+                d3d9QuakeWorldToView[3, 0] = renderInfo.View.ViewMatrix.M30;
+                d3d9QuakeWorldToView[3, 1] = renderInfo.View.ViewMatrix.M31;
+                d3d9QuakeWorldToView[3, 2] = renderInfo.View.ViewMatrix.M32;
+                d3d9QuakeWorldToView[3, 3] = renderInfo.View.ViewMatrix.M33;
 
                 Matrix4x4 d3d9QuakeProjection = new Matrix4x4();
-                d3d9QuakeProjection[0, 0] = renderInfo.ProjectionMatrix.M00;
-                d3d9QuakeProjection[0, 1] = renderInfo.ProjectionMatrix.M01;
-                d3d9QuakeProjection[0, 2] = renderInfo.ProjectionMatrix.M02;
-                d3d9QuakeProjection[0, 3] = renderInfo.ProjectionMatrix.M03;
-                d3d9QuakeProjection[1, 0] = renderInfo.ProjectionMatrix.M10;
-                d3d9QuakeProjection[1, 1] = renderInfo.ProjectionMatrix.M11;
-                d3d9QuakeProjection[1, 2] = renderInfo.ProjectionMatrix.M12;
-                d3d9QuakeProjection[1, 3] = renderInfo.ProjectionMatrix.M13;
-                d3d9QuakeProjection[2, 0] = renderInfo.ProjectionMatrix.M20;
-                d3d9QuakeProjection[2, 1] = renderInfo.ProjectionMatrix.M21;
-                d3d9QuakeProjection[2, 2] = renderInfo.ProjectionMatrix.M22;
-                d3d9QuakeProjection[2, 3] = renderInfo.ProjectionMatrix.M23;
-                d3d9QuakeProjection[3, 0] = renderInfo.ProjectionMatrix.M30;
-                d3d9QuakeProjection[3, 1] = renderInfo.ProjectionMatrix.M31;
-                d3d9QuakeProjection[3, 2] = renderInfo.ProjectionMatrix.M32;
+                d3d9QuakeProjection[0, 0] = renderInfo.View.ProjectionMatrix.M00;
+                d3d9QuakeProjection[0, 1] = renderInfo.View.ProjectionMatrix.M01;
+                d3d9QuakeProjection[0, 2] = renderInfo.View.ProjectionMatrix.M02;
+                d3d9QuakeProjection[0, 3] = renderInfo.View.ProjectionMatrix.M03;
+                d3d9QuakeProjection[1, 0] = renderInfo.View.ProjectionMatrix.M10;
+                d3d9QuakeProjection[1, 1] = renderInfo.View.ProjectionMatrix.M11;
+                d3d9QuakeProjection[1, 2] = renderInfo.View.ProjectionMatrix.M12;
+                d3d9QuakeProjection[1, 3] = renderInfo.View.ProjectionMatrix.M13;
+                d3d9QuakeProjection[2, 0] = renderInfo.View.ProjectionMatrix.M20;
+                d3d9QuakeProjection[2, 1] = renderInfo.View.ProjectionMatrix.M21;
+                d3d9QuakeProjection[2, 2] = renderInfo.View.ProjectionMatrix.M22;
+                d3d9QuakeProjection[2, 3] = renderInfo.View.ProjectionMatrix.M23;
+                d3d9QuakeProjection[3, 0] = renderInfo.View.ProjectionMatrix.M30;
+                d3d9QuakeProjection[3, 1] = renderInfo.View.ProjectionMatrix.M31;
+                d3d9QuakeProjection[3, 2] = renderInfo.View.ProjectionMatrix.M32;
 
                 //Debug.Log(d3d9QuakeProjection);
 
@@ -1354,51 +1411,70 @@ public class AfxInterop : MonoBehaviour
                 afxCamera.projectionMatrix = GL.GetGPUProjectionMatrix(flipViewZ * orgCamProjection, true);
 
                 afxOldCameraClearFlags = afxCamera.clearFlags;
-                afxCamera.clearFlags = CameraClearFlags.Depth;
+                afxCamera.clearFlags = CameraClearFlags.Nothing;
 
-                afxDrawDepth = new CommandBuffer();
-                afxDrawDepth.name = "AfxHookUnity: Draw depth buffer color texture.";
-
-                float orthoZ = afxCamera.nearClipPlane + (afxCamera.nearClipPlane + afxCamera.farClipPlane) / 2.0f;
+                float orthoZ = afxCamera.nearClipPlane;
 
                 var verticies = new Vector3[4] {
-                new Vector3(0, 0, orthoZ),
-                new Vector3(1, 0, orthoZ),
-                new Vector3(0, 1, orthoZ),
-                new Vector3(1, 1, orthoZ)
-            };
+                    new Vector3(0, 0, orthoZ),
+                    new Vector3(1, 0, orthoZ),
+                    new Vector3(0, 1, orthoZ),
+                    new Vector3(1, 1, orthoZ)
+                };
 
                 var uvs = new Vector2[4] {
-                new Vector2(0, 0),
-                new Vector2(1, 0),
-                new Vector2(0, 1),
-                new Vector2(1, 1),
-            };
+                    new Vector2(0, 0),
+                    new Vector2(1, 0),
+                    new Vector2(0, 1),
+                    new Vector2(1, 1),
+                };
 
                 var triangles = new int[6] {
-                0, 1, 2,
-                2, 1, 3,
-            };
+                    2, 1, 0,
+                    3, 1, 2,
+                };
 
                 var m = new Mesh();
                 m.vertices = verticies;
                 m.uv = uvs;
                 m.triangles = triangles;
 
+                this.drawColorMaterial.mainTexture = renderTexture;
                 this.drawDepthMaterial.mainTexture = depthTexture;
 
-                Vector4 zParams = new Vector4((D / C), (D / (C + 1)), 0);
-                this.drawDepthMaterial.SetVector("_ZParams", zParams);
+                Vector4 zParams = new Vector4((D / C), (D / (C + 1)), 0, 1);
 
+                afxCamera.targetTexture = m_ReplacementSurface.cameraTexture;
+
+                afxDrawBegin.Clear();
+                afxDrawBegin.name = "AfxInterop: AfxDrawBeginCallBack.";
+                afxDrawBegin.IssuePluginEvent(AfxInteropGetRenderEventFunc(), 2);
+                afxDrawBegin.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
+                afxDrawBegin.SetInvertCulling(false);
+                afxDrawBegin.SetGlobalVector("_ZParams", zParams);
+                afxDrawBegin.DrawMesh(m, GL.GetGPUProjectionMatrix(flipViewZ * Matrix4x4.Ortho(0, 1, 1, 0, -1, 1), true), this.drawColorMaterial, 0, 0);
+                afxDrawBegin.DrawMesh(m, GL.GetGPUProjectionMatrix(flipViewZ * Matrix4x4.Ortho(0, 1, 1, 0, afxCamera.nearClipPlane, afxCamera.farClipPlane), true), this.drawDepthMaterial, 0, 0);
+                afxDrawBegin.SetInvertCulling(true);
+                afxDrawBegin.SetViewProjectionMatrices(afxCamera.worldToCameraMatrix, afxCamera.projectionMatrix);
+
+                afxDrawDepth.Clear();
+                afxDrawDepth.name = "AfxInterop: Draw depth buffer color texture.";
                 afxDrawDepth.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
-                afxDrawDepth.DrawMesh(m, GL.GetGPUProjectionMatrix(flipViewZ * Matrix4x4.Ortho(0, 1, 1, 0, afxCamera.nearClipPlane, afxCamera.farClipPlane), true), this.drawDepthMaterial);
+                afxDrawDepth.SetInvertCulling(false);
+                afxDrawBegin.SetGlobalVector("_ZParams", zParams);
+                afxDrawDepth.DrawMesh(m, GL.GetGPUProjectionMatrix(flipViewZ * Matrix4x4.Ortho(0, 1, 1, 0, afxCamera.nearClipPlane, afxCamera.farClipPlane), true), this.drawDepthMaterial, 0, 0);
+                afxDrawDepth.SetInvertCulling(true);
+                afxDrawDepth.SetViewProjectionMatrices(afxCamera.worldToCameraMatrix, afxCamera.projectionMatrix);
 
-                afxCamera.targetTexture = renderTexture;
+                afxDrawEnd.Clear();
+                afxDrawEnd.name = "AfxInterop: AfxDrawEndCallBack.";
+                afxDrawEnd.CopyTexture(afxCamera.targetTexture, renderTexture);
+                afxDrawEnd.IssuePluginEvent(AfxInteropGetRenderEventFunc(), 3);
 
                 afxCameraUpdated = true;
             }
         }
-        catch(Exception e)
+        catch (Exception e)
         {
             Debug.LogException(e, this);
 
@@ -1406,6 +1482,24 @@ public class AfxInterop : MonoBehaviour
             outSharedColorTextureHandle = IntPtr.Zero;
             outColorDepthTextureWasLost = true;
             outSharedColorDepthTextureHandle = IntPtr.Zero;
+
+            outBeforeTranslucentShadow = false; outAfterTranslucentShadow = false;
+            outBeforeTranslucent = false; outAfterTranslucent = false;
+            outBeforeHud = false; outAfterHud = false;
+        }
+    }
+
+    void AfxInteropRenderPass(AfxRenderPassType pass, ref AfxInteropView view)
+    {
+        // Exceptions must not make it into native code (this is called from native code):
+        try
+        {
+
+        }
+        catch (Exception e)
+        {
+            Debug.LogException(e, this);
+
         }
     }
 
@@ -1414,9 +1508,9 @@ public class AfxInterop : MonoBehaviour
         return Marshal.PtrToStringAnsi(AfxInteropCommands_GetCommandArg(commands, index, argIndex));
     }
 
-    bool AfxInteropOnRenderView(ref float Tx, ref float Ty, ref float Tz, ref float Rx, ref float Ry, ref float Rz, ref float Fov)
+    bool AfxInteropOnViewOverride(ref float Tx, ref float Ty, ref float Tz, ref float Rx, ref float Ry, ref float Rz, ref float Fov)
     {
-        if(afxOverrideCameraEnabled && null != afxOverrideCamera)
+        if (afxOverrideCameraEnabled && null != afxOverrideCamera)
         {
             Transform transform = afxOverrideCamera.transform;
 

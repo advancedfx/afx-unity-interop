@@ -1,0 +1,7 @@
+[submodule "ScriptableRenderPipeline"]
+	path = ScriptableRenderPipeline
+	url = https://github.com/advancedfx/afx-unity-srp
+	branch = advancedfx
+[submodule "source/shared/Detours"]
+	path = source/shared/Detours
+	url = https://github.com/advancedfx/Detours.git
