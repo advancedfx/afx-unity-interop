@@ -1,7 +1,8 @@
 # Test version
 
-- Tested with Unity 2018.3.8f1.
-- Needs HLAE 2.64.0 (2019-04-14T18:00Z) or newer.
+- afx_interop version 5
+- Tested with Unity 2019.1.1f1.
+- Needs HLAE 2.65.0 (2019-05-01T18:30) or newer.
 
 # Breaking change:
 
