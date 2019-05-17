@@ -50,7 +50,6 @@ w =  100 / 2.54 * unityY
 // TODO: Might leak texture handles. Not anymore? Dunno.
 
 [DisallowMultipleComponent]
-[RequireComponent(typeof(Camera))]
 public class AfxInterop : UnityEngine.Rendering.LWRP.AfxInteropBase
 {
     public class BaseCalc : IDisposable
@@ -321,13 +320,19 @@ public class AfxInterop : UnityEngine.Rendering.LWRP.AfxInteropBase
 
     //
 
+    [Header("General")]
     public string pipeName = "advancedfxInterop";
-
     public bool suspended = false;
 
-    public Camera afxOverrideCamera = null;
+    [Header("In-game Rendering")]
+    public Camera worldCamera = null;
+    public bool worldCameraEnabled = true;
+    public Camera guiCamera = null;
+    public bool guiCameraEnabled = true;
 
-    public bool afxOverrideCameraEnabled = true;
+    [Header("Other")]
+    public Camera overrideCamera = null;
+    public bool overideCameraEnabled = true;
 
     public AfxInteropCommandsCallbackDelegate afxInteropCommandsCallback;
 
@@ -509,13 +514,32 @@ public class AfxInterop : UnityEngine.Rendering.LWRP.AfxInteropBase
         this.drawDepthMaterial = Resources.Load("advancedfx/Materials/DrawDepth") as Material;
 
         afxDrawBegin = new CommandBuffer();
+        afxDrawBegin.name = "AfxInterop: AfxDrawBeginCallBack.";
+
         afxDrawDepth = new CommandBuffer();
+        afxDrawDepth.name = "AfxInterop: Draw depth buffer color texture.";
+
         afxDrawEnd = new CommandBuffer();
+        afxDrawEnd.name = "AfxInterop: AfxDrawEndCallBack.";
 
         m_AfxInteropCommandsDelegate += AfxInteropCommands;
         m_AfxInteropRenderDelegate += AfxInteropRender;
         m_AfxInteropRenderPassDelegate += AfxInteropRenderPass;
         m_AfxInteropOnViewOverrideCallbackDelegate += AfxInteropOnViewOverride;
+
+        unityToQuakeScale = Matrix4x4.Scale(new Vector3(unityToQuakeScaleFac, unityToQuakeScaleFac, unityToQuakeScaleFac));
+
+        unityToQuake = new Matrix4x4();
+        unityToQuake[0, 0] = 0; unityToQuake[0, 1] = 0; unityToQuake[0, 2] = 1; unityToQuake[0, 3] = 0;
+        unityToQuake[1, 0] = -1; unityToQuake[1, 1] = 0; unityToQuake[1, 2] = 0; unityToQuake[1, 3] = 0;
+        unityToQuake[2, 0] = 0; unityToQuake[2, 1] = 1; unityToQuake[2, 2] = 0; unityToQuake[2, 3] = 0;
+        unityToQuake[3, 0] = 0; unityToQuake[3, 1] = 0; unityToQuake[3, 2] = 0; unityToQuake[3, 3] = 1;
+
+        flipViewZ = new Matrix4x4();
+        flipViewZ[0, 0] = 1; flipViewZ[0, 1] = 0; flipViewZ[0, 2] = 0; flipViewZ[0, 3] = 0;
+        flipViewZ[1, 0] = 0; flipViewZ[1, 1] = 1; flipViewZ[1, 2] = 0; flipViewZ[1, 3] = 0;
+        flipViewZ[2, 0] = 0; flipViewZ[2, 1] = 0; flipViewZ[2, 2] = -1; flipViewZ[2, 3] = 0;
+        flipViewZ[3, 0] = 0; flipViewZ[3, 1] = 0; flipViewZ[3, 2] = 0; flipViewZ[3, 3] = 1;
     }
 
     public void OnEnable()
@@ -540,18 +564,17 @@ public class AfxInterop : UnityEngine.Rendering.LWRP.AfxInteropBase
         }
     }
 
+    private void FixupCamera(Camera camera)
+    {
+        camera.allowHDR = true;
+        camera.allowMSAA = false;
+        camera.allowDynamicResolution = false;
+    }
 
     public void Start()
     {
-        afxCamera = GetComponent<Camera>();
-
-        if (null != afxCamera)
-        {
-            afxCamera.allowHDR = true;
-            afxCamera.allowMSAA = false;
-            afxCamera.allowDynamicResolution = false;
-        }
-        else Debug.LogError("AfxInterop component must be attached to a Camera component.", this);
+        if (null != worldCamera) FixupCamera(worldCamera);
+        if (null != guiCamera) FixupCamera(guiCamera);
     }
 
     public void Update()
@@ -561,27 +584,75 @@ public class AfxInterop : UnityEngine.Rendering.LWRP.AfxInteropBase
 
     void LateUpdate()
     {
-        if (!afxCameraUpdated)
+        if (renderWorldCamera)
         {
-            return;
+            afxDrawBegin.Clear();
+            afxDrawBegin.IssuePluginEvent(AfxInteropGetRenderEventFunc(), 2);
+            afxDrawBegin.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
+            afxDrawBegin.SetInvertCulling(false);
+            afxDrawBegin.SetGlobalVector("_ZParams", zParams);
+            afxDrawBegin.DrawMesh(screenSpaceQuad, GL.GetGPUProjectionMatrix(flipViewZ * Matrix4x4.Ortho(0, 1, 1, 0, -1, 1), true), this.drawColorMaterial, 0, 0);
+            afxDrawBegin.DrawMesh(screenSpaceQuad, GL.GetGPUProjectionMatrix(flipViewZ * Matrix4x4.Ortho(0, 1, 1, 0, worldCamera.nearClipPlane, worldCamera.farClipPlane), true), this.drawDepthMaterial, 0, 0);
+            afxDrawBegin.SetInvertCulling(true);
+            afxDrawBegin.SetViewProjectionMatrices(worldCamera.worldToCameraMatrix, worldCamera.projectionMatrix);
+
+            afxDrawDepth.Clear();
+            afxDrawDepth.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
+            afxDrawDepth.SetInvertCulling(false);
+            afxDrawBegin.SetGlobalVector("_ZParams", zParams);
+            afxDrawDepth.DrawMesh(screenSpaceQuad, GL.GetGPUProjectionMatrix(flipViewZ * Matrix4x4.Ortho(0, 1, 1, 0, worldCamera.nearClipPlane, worldCamera.farClipPlane), true), this.drawDepthMaterial, 0, 0);
+            afxDrawDepth.SetInvertCulling(true);
+            afxDrawDepth.SetViewProjectionMatrices(worldCamera.worldToCameraMatrix, worldCamera.projectionMatrix);
+
+            afxDrawEnd.Clear();
+            afxDrawEnd.CopyTexture(worldCamera.targetTexture, this.drawColorMaterial.mainTexture);
+            afxDrawEnd.IssuePluginEvent(AfxInteropGetRenderEventFunc(), 3);
+
+            afxActive = true;
+            GL.invertCulling = true;
+            worldCamera.Render();
+            GL.invertCulling = false;
+            afxActive = false;
+
+            worldCamera.targetTexture = null;
+            worldCamera.clearFlags = oldWorldCameraClearFlags;
+            worldCamera.ResetProjectionMatrix();
+            worldCamera.ResetAspect();
         }
 
-        afxCameraUpdated = false;
+        if (renderGuiCamera)
+        {
+            afxDrawBegin.Clear();
+            if(!renderWorldCamera) afxDrawBegin.IssuePluginEvent(AfxInteropGetRenderEventFunc(), 2);
+            afxDrawBegin.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
+            afxDrawBegin.SetInvertCulling(false);
+            afxDrawBegin.DrawMesh(screenSpaceQuad, GL.GetGPUProjectionMatrix(flipViewZ * Matrix4x4.Ortho(0, 1, 1, 0, -1, 1), true), this.drawColorMaterial, 0, 0);
+            afxDrawBegin.SetInvertCulling(true);
+            afxDrawBegin.SetViewProjectionMatrices(guiCamera.worldToCameraMatrix, guiCamera.projectionMatrix);
 
-        afxActive = true;
-        GL.invertCulling = true;
-        afxCamera.Render();
-        GL.invertCulling = false;
-        afxActive = false;
+            afxDrawDepth.Clear();
 
-        //
+            afxDrawEnd.Clear();
+            afxDrawEnd.CopyTexture(guiCamera.targetTexture, this.drawColorMaterial.mainTexture);
+            afxDrawEnd.IssuePluginEvent(AfxInteropGetRenderEventFunc(), 3);
+
+            afxActive = true;
+            GL.invertCulling = true;
+            guiCamera.Render();
+            GL.invertCulling = false;
+            afxActive = false;
+
+            guiCamera.targetTexture = null;
+            guiCamera.clearFlags = oldGuiCameraClearFlags;
+            guiCamera.ResetProjectionMatrix();
+            guiCamera.ResetAspect();
+        }
 
         this.drawColorMaterial.mainTexture = null;
         this.drawDepthMaterial.mainTexture = null;
-        afxCamera.targetTexture = null;
-        afxCamera.clearFlags = afxOldCameraClearFlags;
-        afxCamera.ResetProjectionMatrix();
-        afxCamera.ResetAspect();
+
+        renderWorldCamera = false;
+        renderGuiCamera = false;
     }
 
     //
@@ -786,14 +857,23 @@ public class AfxInterop : UnityEngine.Rendering.LWRP.AfxInteropBase
     private Material drawDepthMaterial;
 
     private bool afxActive = false;
-    private bool afxCameraUpdated = false;
-    private Camera afxCamera;
+    private bool renderWorldCamera = false;
+    private bool renderGuiCamera = false;
+
     private CommandBuffer afxDrawBegin;
     private CommandBuffer afxDrawDepth;
     private CommandBuffer afxDrawEnd;
-    private CameraClearFlags afxOldCameraClearFlags;
+
+    private CameraClearFlags oldWorldCameraClearFlags;
+    private CameraClearFlags oldGuiCameraClearFlags;
 
     SurfaceData m_ReplacementSurface;
+    Mesh screenSpaceQuad;
+    Vector4 zParams;
+    Matrix4x4 unityToQuakeScale;
+    Matrix4x4 unityToQuake;
+    Matrix4x4 flipViewZ;
+
 
     AfxInteropCommandsDelegate m_AfxInteropCommandsDelegate;
     AfxInteropRenderDelegate m_AfxInteropRenderDelegate;
@@ -1314,10 +1394,8 @@ public class AfxInterop : UnityEngine.Rendering.LWRP.AfxInteropBase
                 return;
             }
 
-            if (null == afxCamera) return;
-
-            outBeforeHud = true;
-
+            if (worldCameraEnabled && null != worldCamera
+                || guiCameraEnabled && null != guiCamera)
             {
                 int width = renderInfo.View.Width;
                 int height = renderInfo.View.Height;
@@ -1357,121 +1435,105 @@ public class AfxInterop : UnityEngine.Rendering.LWRP.AfxInteropBase
                 d3d9QuakeProjection[3, 1] = renderInfo.View.ProjectionMatrix.M31;
                 d3d9QuakeProjection[3, 2] = renderInfo.View.ProjectionMatrix.M32;
 
-                //Debug.Log(d3d9QuakeProjection);
-
-                Matrix4x4 unityToQuakeScale = Matrix4x4.Scale(new Vector3(unityToQuakeScaleFac, unityToQuakeScaleFac, unityToQuakeScaleFac));
-
-                Matrix4x4 unityToQuake = new Matrix4x4();
-                unityToQuake[0, 0] = 0; unityToQuake[0, 1] = 0; unityToQuake[0, 2] = 1; unityToQuake[0, 3] = 0;
-                unityToQuake[1, 0] = -1; unityToQuake[1, 1] = 0; unityToQuake[1, 2] = 0; unityToQuake[1, 3] = 0;
-                unityToQuake[2, 0] = 0; unityToQuake[2, 1] = 1; unityToQuake[2, 2] = 0; unityToQuake[2, 3] = 0;
-                unityToQuake[3, 0] = 0; unityToQuake[3, 1] = 0; unityToQuake[3, 2] = 0; unityToQuake[3, 3] = 1;
-
-                Matrix4x4 flipViewZ = new Matrix4x4();
-                flipViewZ[0, 0] = 1; flipViewZ[0, 1] = 0; flipViewZ[0, 2] = 0; flipViewZ[0, 3] = 0;
-                flipViewZ[1, 0] = 0; flipViewZ[1, 1] = 1; flipViewZ[1, 2] = 0; flipViewZ[1, 3] = 0;
-                flipViewZ[2, 0] = 0; flipViewZ[2, 1] = 0; flipViewZ[2, 2] = -1; flipViewZ[2, 3] = 0;
-                flipViewZ[3, 0] = 0; flipViewZ[3, 1] = 0; flipViewZ[3, 2] = 0; flipViewZ[3, 3] = 1;
-
                 Matrix4x4 unityToWorldViewInverse = (flipViewZ * (d3d9QuakeWorldToView * (unityToQuake * unityToQuakeScale))).inverse;
 
-                const double Rad2Deg = 180.0 / Math.PI;
+                Vector4 unityPosition = unityToWorldViewInverse.GetColumn(3);
 
-                Vector4 quakePosition = unityToWorldViewInverse.GetColumn(3);
-                afxCamera.transform.position = new Vector3(quakePosition.x, quakePosition.y, quakePosition.z);
+                Quaternion unityRotation = unityToWorldViewInverse.rotation;
 
-                Quaternion rotation = unityToWorldViewInverse.rotation;
-                afxCamera.transform.rotation = new Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
-
-                Vector3 quakeScale = unityToWorldViewInverse.lossyScale;
-                afxCamera.transform.localScale = new Vector3(quakeScale.x, quakeScale.y, quakeScale.z);
-
-                //afxCamera.worldToCameraMatrix = unityToWorldView;
+                Vector3 unityScale = unityToWorldViewInverse.lossyScale;
 
                 float C = d3d9QuakeProjection[2, 2]; // - far_plane/(far_plane - near_plane)
                 float D = d3d9QuakeProjection[2, 3]; // C * near_plane
 
-                //Debug.Log((D / C) + " / " + (D / (C + 1)));
+                Rect cameraRect = new Rect(0, 0, width, height); ;
 
-                afxCamera.nearClipPlane = (D / C) / unityToQuakeScaleFac;
-                afxCamera.farClipPlane = (D / (C + 1)) / unityToQuakeScaleFac;
-
-                afxCamera.pixelRect = new Rect(0, 0, width, height);
-                afxCamera.rect = new Rect(0, 0, width, height);
+                float cameraNear = (D / C) / unityToQuakeScaleFac;
+                float cameraFar = (D / (C + 1)) / unityToQuakeScaleFac;
 
                 float horizontalFovRad = (float)Math.Atan(1.0 / d3d9QuakeProjection[0, 0]) * 2.0f;
-                float verticalFovDeg = (float)(2 * Math.Atan(Math.Tan(horizontalFovRad / 2.0) * height / (float)width) * Rad2Deg);
+                float verticalFovDeg = (float)(2 * Math.Atan(Math.Tan(horizontalFovRad / 2.0) * height / (float)width) * Mathf.Rad2Deg);
+                float aspect = (0 != height) ? (width / (float)height) : 1.0f;
 
-                //Debug.Log(horizontalFovRad * Rad2Deg + " / " + verticalFovDeg);
+                screenSpaceQuad = new Mesh();
 
-                afxCamera.fieldOfView = verticalFovDeg;
-                afxCamera.aspect = (0 != height) ? (width / (float)height) : 1.0f;
-
-                Matrix4x4 orgCamProjection = afxCamera.projectionMatrix;
-                afxCamera.projectionMatrix = GL.GetGPUProjectionMatrix(flipViewZ * orgCamProjection, true);
-
-                afxOldCameraClearFlags = afxCamera.clearFlags;
-                afxCamera.clearFlags = CameraClearFlags.Nothing;
-
-                float orthoZ = afxCamera.nearClipPlane;
-
-                var verticies = new Vector3[4] {
-                    new Vector3(0, 0, orthoZ),
-                    new Vector3(1, 0, orthoZ),
-                    new Vector3(0, 1, orthoZ),
-                    new Vector3(1, 1, orthoZ)
+                screenSpaceQuad.vertices = new Vector3[4] {
+                    new Vector3(0, 0, cameraNear),
+                    new Vector3(1, 0, cameraNear),
+                    new Vector3(0, 1, cameraNear),
+                    new Vector3(1, 1, cameraNear)
                 };
-
-                var uvs = new Vector2[4] {
+                screenSpaceQuad.uv = new Vector2[4] {
                     new Vector2(0, 0),
                     new Vector2(1, 0),
                     new Vector2(0, 1),
                     new Vector2(1, 1),
                 };
-
-                var triangles = new int[6] {
+                screenSpaceQuad.triangles = new int[6] {
                     2, 1, 0,
                     3, 1, 2,
                 };
 
-                var m = new Mesh();
-                m.vertices = verticies;
-                m.uv = uvs;
-                m.triangles = triangles;
-
                 this.drawColorMaterial.mainTexture = renderTexture;
                 this.drawDepthMaterial.mainTexture = depthTexture;
 
-                Vector4 zParams = new Vector4((D / C), (D / (C + 1)), 0, 1);
+                zParams = new Vector4((D / C), (D / (C + 1)), 0, 1);
 
-                afxCamera.targetTexture = m_ReplacementSurface.cameraTexture;
+                if (worldCameraEnabled && null != worldCamera)
+                {
+                    outBeforeHud = true;
 
-                afxDrawBegin.Clear();
-                afxDrawBegin.name = "AfxInterop: AfxDrawBeginCallBack.";
-                afxDrawBegin.IssuePluginEvent(AfxInteropGetRenderEventFunc(), 2);
-                afxDrawBegin.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
-                afxDrawBegin.SetInvertCulling(false);
-                afxDrawBegin.SetGlobalVector("_ZParams", zParams);
-                afxDrawBegin.DrawMesh(m, GL.GetGPUProjectionMatrix(flipViewZ * Matrix4x4.Ortho(0, 1, 1, 0, -1, 1), true), this.drawColorMaterial, 0, 0);
-                afxDrawBegin.DrawMesh(m, GL.GetGPUProjectionMatrix(flipViewZ * Matrix4x4.Ortho(0, 1, 1, 0, afxCamera.nearClipPlane, afxCamera.farClipPlane), true), this.drawDepthMaterial, 0, 0);
-                afxDrawBegin.SetInvertCulling(true);
-                afxDrawBegin.SetViewProjectionMatrices(afxCamera.worldToCameraMatrix, afxCamera.projectionMatrix);
+                    worldCamera.transform.position = unityPosition;
+                    worldCamera.transform.rotation = unityRotation;
+                    worldCamera.transform.localScale = unityScale;
 
-                afxDrawDepth.Clear();
-                afxDrawDepth.name = "AfxInterop: Draw depth buffer color texture.";
-                afxDrawDepth.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
-                afxDrawDepth.SetInvertCulling(false);
-                afxDrawBegin.SetGlobalVector("_ZParams", zParams);
-                afxDrawDepth.DrawMesh(m, GL.GetGPUProjectionMatrix(flipViewZ * Matrix4x4.Ortho(0, 1, 1, 0, afxCamera.nearClipPlane, afxCamera.farClipPlane), true), this.drawDepthMaterial, 0, 0);
-                afxDrawDepth.SetInvertCulling(true);
-                afxDrawDepth.SetViewProjectionMatrices(afxCamera.worldToCameraMatrix, afxCamera.projectionMatrix);
+                    worldCamera.targetTexture = m_ReplacementSurface.cameraTexture;
 
-                afxDrawEnd.Clear();
-                afxDrawEnd.name = "AfxInterop: AfxDrawEndCallBack.";
-                afxDrawEnd.CopyTexture(afxCamera.targetTexture, renderTexture);
-                afxDrawEnd.IssuePluginEvent(AfxInteropGetRenderEventFunc(), 3);
+                    worldCamera.nearClipPlane = cameraNear;
+                    worldCamera.farClipPlane = cameraFar;
 
-                afxCameraUpdated = true;
+                    worldCamera.pixelRect = cameraRect;
+                    worldCamera.rect = cameraRect;
+
+                    worldCamera.fieldOfView = verticalFovDeg;
+                    worldCamera.aspect = aspect;
+
+                    Matrix4x4 orgCamProjection = worldCamera.projectionMatrix;
+                    worldCamera.projectionMatrix = GL.GetGPUProjectionMatrix(flipViewZ * orgCamProjection, true);
+
+                    oldWorldCameraClearFlags = worldCamera.clearFlags;
+                    worldCamera.clearFlags = CameraClearFlags.Nothing;
+
+                    renderWorldCamera = true;
+                }
+
+                if (guiCameraEnabled && null != guiCamera)
+                {
+                    outAfterHud = true;
+
+                    guiCamera.transform.position = unityPosition;
+                    guiCamera.transform.rotation = unityRotation;
+                    guiCamera.transform.localScale = unityScale;
+
+                    guiCamera.targetTexture = m_ReplacementSurface.cameraTexture;
+
+                    guiCamera.nearClipPlane = cameraNear;
+                    guiCamera.farClipPlane = cameraFar;
+
+                    guiCamera.pixelRect = cameraRect;
+                    guiCamera.rect = cameraRect;
+
+                    guiCamera.fieldOfView = verticalFovDeg;
+                    guiCamera.aspect = aspect;
+
+                    Matrix4x4 orgCamProjection = guiCamera.projectionMatrix;
+                    guiCamera.projectionMatrix = GL.GetGPUProjectionMatrix(flipViewZ * orgCamProjection, true);
+
+                    oldGuiCameraClearFlags = guiCamera.clearFlags;
+                    guiCamera.clearFlags = CameraClearFlags.Nothing;
+
+                    renderGuiCamera = true;
+                }
             }
         }
         catch (Exception e)
@@ -1486,6 +1548,9 @@ public class AfxInterop : UnityEngine.Rendering.LWRP.AfxInteropBase
             outBeforeTranslucentShadow = false; outAfterTranslucentShadow = false;
             outBeforeTranslucent = false; outAfterTranslucent = false;
             outBeforeHud = false; outAfterHud = false;
+
+            renderWorldCamera = false;
+            renderGuiCamera = false;
         }
     }
 
@@ -1510,9 +1575,9 @@ public class AfxInterop : UnityEngine.Rendering.LWRP.AfxInteropBase
 
     bool AfxInteropOnViewOverride(ref float Tx, ref float Ty, ref float Tz, ref float Rx, ref float Ry, ref float Rz, ref float Fov)
     {
-        if (afxOverrideCameraEnabled && null != afxOverrideCamera)
+        if (overideCameraEnabled && null != overrideCamera)
         {
-            Transform transform = afxOverrideCamera.transform;
+            Transform transform = overrideCamera.transform;
 
             AfxInteropVector vec = FromUnityVector(transform.position);
 
@@ -1526,7 +1591,7 @@ public class AfxInterop : UnityEngine.Rendering.LWRP.AfxInteropBase
             Ry = rot.Yaw;
             Rz = rot.Roll;
 
-            Fov = afxOverrideCamera.fieldOfView;
+            Fov = overrideCamera.fieldOfView;
 
             return true;
         }

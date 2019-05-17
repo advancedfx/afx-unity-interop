@@ -4,25 +4,35 @@
 - Tested with Unity 2019.1.1f1.
 - Needs HLAE 2.65.0 (2019-05-01T18:30) or newer.
 
-# Breaking change:
-
-- If you convert a version 2 to version 3 (current) project, then you need to scale everything by 12/16 (because 1 Unit is 1/16 foot = 12/16 inch and not 1 inch) and this has been corrected.
-
 # Important
 
 Make sure your Unity console does not have the "Error Pause" button pushed in, otherwise the game and Unity will freeze upon exceptions in your other Unity code.
 
 Please understand that this is a test version and things will change heavily!
 
+# Installation
+
+We recommend downloading with git, because that way you will get the submodules and have less traffic upon updates.
+
+Don't forget: `git submodule update` after checking out the latest version.
+
+https://git-scm.com/downloads
+
+```
+cd /c/source/folder/here
+git clone --no-checkout https://github.com/advancedfx/afx-unity-interop.git
+cd afx-unit-interop
+git checkout v0.5.0
+git submodule update
+```
+
 # Usage:
 
-1) Use HLAE CustomLoader to inject AfxHookUnity.dll into the Unity.exe and open the example project.
+1) Launch CS:GO from HLAE with -afxInterop (case-sensitve option).
 
-2) Launch CS:GO from HLAE with -afxInterop (case-sensitve option).
+2) Load a GOTV demo (the example propject has colorfoul boxes at the T spawn on de_mirage).
 
-3) Load a GOTV demo (the example propject has colorfoul boxes at the T spawn on de_mirage).
-
-4) Enter these commands (if you want the observer target cone):  
+3) Enter these commands (if you want the observer target cone):  
 ```
 mirv_calcs handle add localPlayer afxLocalPlayer
 mirv_calcs handle add observerTarget afxObserverTarget afxLocalPlayer
@@ -32,9 +42,9 @@ mirv_calcs int add teamNumber afxObserverTeamNumber afxObserverTarget
 ```  
 Hint: There's a spectator handle key calc, so you could make a view cone for every player ;)
 
-5) Run the project in Untiy (Editor).
+4) Run the project in Untiy (Editor).
 
-6) Enter `afx_interop connect 1` into console to connect CS:GO to Unity, then it should be drawing the boxes at T-spawn on mirage.
+5) Enter `afx_interop connect 1` into console to connect CS:GO to Unity, then it should be drawing the boxes at T-spawn on mirage.
 
 # Known problems:
 
