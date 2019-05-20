@@ -22,8 +22,8 @@ https://git-scm.com/downloads
 cd /c/source/folder/here
 git clone --no-checkout https://github.com/advancedfx/afx-unity-interop.git
 cd afx-unity-interop
-git checkout v0.5.1
-git submodule update
+git checkout v0.5.2
+git submodule update --init
 ```
 
 # Usage:
