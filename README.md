@@ -47,7 +47,7 @@ Hint: There's a spectator handle key calc, so you could make a view cone for eve
 5) Enter `afx_interop connect 1` into console to connect CS:GO to Unity, then it should be drawing the boxes at T-spawn on mirage.
 
 # Known problems:
-
+- Needs queued / threaded rendering, so [mat_queue_mode must not be 0](https://github.com/advancedfx/afx-unity-interop/issues/2).
 - Transparent materials will be overdrawn (e.g. smoke particles or worst: if fully in smoke (can be dampened a bit by putting a baseFx stream into preview and setting smokeOverlayAlphaFactor less than 1 on that and forceBuildingCubeMaps 0).
 
 # Planned changes:
