@@ -42,7 +42,7 @@ mirv_calcs int add teamNumber afxObserverTeamNumber afxObserverTarget
 ```  
 Hint: There's a spectator handle key calc, so you could make a view cone for every player ;)
 
-4) Run the project in Untiy (Editor).
+4) Unity (Editor): Load the project, open the Example scene in Assets/Resources/Example/Scenes and Run it (Play button).
 
 5) Enter `afx_interop connect 1` into console to connect CS:GO to Unity, then it should be drawing the boxes at T-spawn on mirage.
 
