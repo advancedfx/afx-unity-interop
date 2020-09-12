@@ -5,3 +5,4 @@
 [submodule "source/shared/Detours"]
 	path = source/shared/Detours
 	url = https://github.com/advancedfx/Detours.git
+	branch = upstream
